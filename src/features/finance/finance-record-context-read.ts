@@ -415,16 +415,31 @@ export async function readFinanceRecordContext(
   };
   const paymentMethod = () =>
     payment?.payment_method === null || !payment ? null : text(payment.payment_method);
-  if (["cimac_apartment_rent", "cimac_apartment_deposit"].includes(sourceType ?? "")) {
+  if (
+    ["cimac_apartment_rent", "cimac_apartment_deposit", "cimac_apartment_property_fee"].includes(
+      sourceType ?? "",
+    )
+  ) {
     if (!payment || !sourceId || building.project_id !== CIMAC_PROJECT_ID)
       return decodeFinanceRecordContext(context);
     const reservation = await one(
       client,
       "cimac_apartment_paid_reservations",
-      "id,unit_id,building_id,customer_id,status,rent_payment_id,deposit_payment_id,rent_amount_xof,deposit_amount_xof",
+      "id,unit_id,building_id,customer_id,status,rent_payment_id,deposit_payment_id,rent_amount_xof,deposit_amount_xof,property_payment_id,property_fee_amount_xof,property_period_start,property_period_end,paid_period_start,paid_period_end",
       sourceId,
     );
     const rent = sourceType === "cimac_apartment_rent";
+    const property = sourceType === "cimac_apartment_property_fee";
+    const paymentKey = property
+      ? "property_payment_id"
+      : rent
+        ? "rent_payment_id"
+        : "deposit_payment_id";
+    const amountKey = property
+      ? "property_fee_amount_xof"
+      : rent
+        ? "rent_amount_xof"
+        : "deposit_amount_xof";
     if (
       !reservation ||
       reservation.status !== "paid_reserved" ||
@@ -434,9 +449,9 @@ export async function readFinanceRecordContext(
       !(await matchesScope(nullableId(reservation.unit_id))) ||
       !reservation.customer_id ||
       reservation.customer_id !== payment.customer_id ||
-      reservation[rent ? "rent_payment_id" : "deposit_payment_id"] !== payment.id ||
-      row.category !== (rent ? "lease_rent" : "lease_deposit") ||
-      row.direction !== (rent ? "income" : "liability_in") ||
+      reservation[paymentKey] !== payment.id ||
+      row.category !== (property ? "property_fee" : rent ? "lease_rent" : "lease_deposit") ||
+      row.direction !== (rent || property ? "income" : "liability_in") ||
       payment.currency !== "XOF" ||
       payment.native_settlement !== false ||
       Number(payment.exchange_rate_to_xof) !== 1 ||
@@ -445,8 +460,7 @@ export async function readFinanceRecordContext(
       row.amount_native !== null ||
       row.entry_date !== payment.payment_date ||
       numeric(payment.amount) <= 0 ||
-      numeric(payment.amount) !==
-        numeric(reservation[rent ? "rent_amount_xof" : "deposit_amount_xof"]) ||
+      numeric(payment.amount) !== numeric(reservation[amountKey]) ||
       numeric(payment.amount) !== context.amountXof
     )
       return decodeFinanceRecordContext(context);
@@ -454,6 +468,12 @@ export async function readFinanceRecordContext(
     const customer = customerId ? await one(client, "customers", "id,name", customerId) : null;
     if (customer) context.customer = { id: text(customer.id), label: text(customer.name) };
     context.paymentMethod = paymentMethod();
+    if (property || rent) {
+      const start = reservation[property ? "property_period_start" : "paid_period_start"];
+      const end = reservation[property ? "property_period_end" : "paid_period_end"];
+      if (typeof start === "string" && typeof end === "string")
+        context.period = { start, end, source: "已付款公寓收据登记的服务期间" };
+    }
     context.source = {
       type: text(sourceType),
       id: sourceId,

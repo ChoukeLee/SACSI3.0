@@ -22,6 +22,7 @@ describe("display labels", () => {
   it("names paid apartment reservation receipts without implying a lease or occupancy", () => {
     expect(financialBusinessLabel("cimac_apartment_rent", "zh")).toBe("公寓预订租金");
     expect(financialBusinessLabel("cimac_apartment_deposit", "zh")).toBe("公寓预订押金");
+    expect(financialBusinessLabel("cimac_apartment_property_fee", "zh")).toBe("公寓预订物业费");
     expect(financialBusinessLabel("cimac_apartment_rent", "fr")).toBe(
       "Loyer de réservation d’appartement",
     );

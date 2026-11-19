@@ -12,6 +12,7 @@ import {
 
 type Json = Record<string, any>;
 const migrationName = "20261117181959_cimac_b17_paid_apartment_reservations.sql";
+const combinedMigrationName = "20261119115407_cimac_apartment_combined_receipts.sql";
 let cluster: Awaited<ReturnType<typeof createNativePaymentPostgres>>, db: pg.Client;
 let actor: string, project: string, building: string;
 const used = new Set<string>();
@@ -21,6 +22,8 @@ beforeAll(async () => {
   const installed = await installApplicationRebuild(db);
   if (!installed.includes(migrationName))
     await db.query(await readFile(`supabase/migrations/${migrationName}`, "utf8"));
+  if (!installed.includes(combinedMigrationName))
+    await db.query(await readFile(`supabase/migrations/${combinedMigrationName}`, "utf8"));
   actor = await person("admin");
   project = (
     await owner(
@@ -120,6 +123,51 @@ async function execute(p: Json, id = actor, client = db) {
   );
   return result;
 }
+async function combinedInput(count = 1, holdCount = 0): Promise<Json> {
+  const p = await input(count);
+  p.schemaVersion = 2;
+  for (const [index, room] of p.rooms.entries()) {
+    const profile = (
+      await owner(
+        "select monthly_property_fee_xof from cimac_apartment_profiles where unit_id=$1",
+        [room.unitId],
+      )
+    ).rows[0];
+    room.propertyFeeAmountXof = Number(profile.monthly_property_fee_xof) * 12;
+    room.propertyPeriodStart = "2027-01-01";
+    room.propertyPeriodEnd = "2027-12-31";
+    p.totalAmountXof += room.propertyFeeAmountXof;
+    if (index < holdCount) {
+      await login();
+      await db.query("select cimac_apartment_reservations_execute_rpc($1)", [
+        {
+          requestId: randomUUID(),
+          originalInstruction: "Synthetic existing unpaid hold with explicit later replacement",
+          operations: [
+            {
+              type: "reserve",
+              unitId: room.unitId,
+              expectedUnitUpdatedAt: room.expectedUnitUpdatedAt,
+              expectedReservationId: null,
+              expectedReservationUpdatedAt: null,
+              reserverName: "Synthetic previous reserver " + index,
+              reason: "Synthetic original unpaid reservation",
+            },
+          ],
+        },
+      ]);
+      const hold = (
+        await owner(
+          "select id,to_jsonb(h)->>'updated_at' stamp from cimac_apartment_reservations h where unit_id=$1 and status='reserved'",
+          [room.unitId],
+        )
+      ).rows[0];
+      room.expectedHoldId = hold.id;
+      room.expectedHoldUpdatedAt = hold.stamp;
+    }
+  }
+  return p;
+}
 async function snapshot() {
   return (
     await owner(
@@ -161,7 +209,13 @@ it("posts one physical three-room receipt as six standard payments without a lea
   expect(after.receipts).toHaveLength(before.receipts.length + 1);
   expect(
     r.data.verification.reservations.every(
-      (x: Json) => x.status === "paid_reserved" && x.agreement_end_date === "2028-12-31",
+      (x: Json) =>
+        x.status === "paid_reserved" &&
+        x.agreement_end_date === "2028-12-31" &&
+        x.property_fee_amount_xof === null &&
+        x.property_period_start === null &&
+        x.property_period_end === null &&
+        x.property_payment_id === null,
     ),
   ).toBe(true);
 });
@@ -485,4 +539,185 @@ it("rejects caller-fabricated paid money and extra ledgers even with a copied so
     ),
   ).rejects.toThrow(/PaidMoneyDenied/);
   expect(await snapshot()).toEqual(before);
+});
+
+it("v2 records three exact components and atomically cancels only the expected hold while preserving history", async () => {
+  const p = await combinedInput(2, 1),
+    before = await snapshot(),
+    r = await execute(p),
+    after = await snapshot();
+  expect(r.data.paymentIds).toHaveLength(6);
+  expect(r.data.ledgerIds).toHaveLength(6);
+  expect(r.data.verification.unpaidReservationsBefore).toEqual(
+    before.holds.filter((h: Json) => p.rooms.some((room: Json) => room.unitId === h.unit_id)),
+  );
+  const old = before.holds.find((h: Json) => h.id === p.rooms[0].expectedHoldId),
+    changed = after.holds.find((h: Json) => h.id === old.id);
+  expect(changed.status).toBe("cancelled");
+  expect(changed.reserver_name).toBe(old.reserver_name);
+  expect(changed.updated_by).toBe(actor);
+  expect(changed.last_reason).toBe(p.reason);
+  expect(changed.cancelled_at).not.toBeNull();
+  expect(
+    Object.fromEntries(
+      Object.entries(changed).filter(
+        ([k]) => !["status", "updated_at", "updated_by", "cancelled_at", "last_reason"].includes(k),
+      ),
+    ),
+  ).toEqual(
+    Object.fromEntries(
+      Object.entries(old).filter(
+        ([k]) => !["status", "updated_at", "updated_by", "cancelled_at", "last_reason"].includes(k),
+      ),
+    ),
+  );
+  for (const row of r.data.verification.reservations) {
+    const requestRoom = p.rooms.find((room: Json) => room.unitId === row.unit_id);
+    expect(Number(row.property_fee_amount_xof)).toBe(requestRoom.propertyFeeAmountXof);
+    expect(row.property_period_start).toBe("2027-01-01");
+    expect(row.property_period_end).toBe("2027-12-31");
+    const property = r.data.verification.payments.find(
+      (x: Json) => x.id === row.property_payment_id,
+    );
+    expect(property.source_type).toBe("cimac_apartment_property_fee");
+    expect(property.external_receipt_no).toBe(p.externalReceiptNo);
+    expect(Number(property.amount)).toBe(requestRoom.propertyFeeAmountXof);
+    expect(property.receipt_no).toMatch(/^WB-CIMAC-B17-L-\d+-20261117-PROP-\d+$/);
+    const ledger = r.data.verification.ledger.find((x: Json) => x.payment_id === property.id);
+    expect(ledger.category).toBe("property_fee");
+    expect(ledger.direction).toBe("income");
+    expect(Number(ledger.amount_xof)).toBe(requestRoom.propertyFeeAmountXof);
+  }
+  expect(
+    r.data.verification.payments.reduce((sum: number, x: Json) => sum + Number(x.amount), 0),
+  ).toBe(p.totalAmountXof);
+  for (const key of ["units", "profiles", "flags", "leases", "daily", "receivables"])
+    expect(after[key]).toEqual(before[key]);
+  expect(after.receipts).toHaveLength(before.receipts.length + 1);
+  expect(after.payments).toHaveLength(before.payments.length + 6);
+  expect(after.ledger).toHaveLength(before.ledger.length + 6);
+  expect(await execute(p)).toEqual({ ...r, idempotent: true });
+  await login();
+  expect(
+    (await db.query("select cimac_apartment_paid_receipt_status_rpc($1) value", [p.requestId]))
+      .rows[0].value.data,
+  ).toEqual(r.data);
+});
+
+it("v2 rejects stale, wrong, missing and malformed hold expectations with the entire batch unchanged", async () => {
+  const base = await combinedInput(2, 2),
+    before = await snapshot();
+  for (const change of [
+    (p: Json) => (p.rooms[1].expectedHoldId = randomUUID()),
+    (p: Json) => (p.rooms[1].expectedHoldUpdatedAt = "2000-01-01T00:00:00Z"),
+    (p: Json) => {
+      p.rooms[0].expectedHoldId = null;
+      p.rooms[0].expectedHoldUpdatedAt = null;
+    },
+    (p: Json) => (p.rooms[0].expectedHoldUpdatedAt = null),
+    (p: Json) => (p.rooms[0].expectedHoldId = null),
+    (p: Json) => (p.rooms[1].expectedHoldId = p.rooms[0].expectedHoldId),
+  ]) {
+    const p = structuredClone(base);
+    change(p);
+    await expect(execute(p)).rejects.toThrow();
+    expect(await snapshot()).toEqual(before);
+  }
+});
+
+it("v2 validates the annual profile fee, complete period, totals, version and field whitelist", async () => {
+  const base = await combinedInput(),
+    before = await snapshot();
+  for (const change of [
+    (p: Json) => p.rooms[0].propertyFeeAmountXof++,
+    (p: Json) => {
+      p.rooms[0].propertyFeeAmountXof++;
+      p.totalAmountXof++;
+    },
+    (p: Json) => (p.rooms[0].propertyFeeAmountXof = "360000"),
+    (p: Json) => (p.rooms[0].propertyPeriodStart = "2027-02-01"),
+    (p: Json) => (p.rooms[0].propertyPeriodEnd = "2027-11-30"),
+    (p: Json) => delete p.rooms[0].propertyPeriodEnd,
+    (p: Json) => delete p.schemaVersion,
+    (p: Json) => (p.schemaVersion = 1),
+    (p: Json) => (p.schemaVersion = "2"),
+    (p: Json) => (p.rooms[0].propertyPaymentId = randomUUID()),
+  ]) {
+    const p = structuredClone(base);
+    change(p);
+    await expect(execute(p)).rejects.toThrow();
+    expect(await snapshot()).toEqual(before);
+  }
+});
+
+it("v2 retains finance permission for no-hold receipts without granting finance the admin-only hold cancellation", async () => {
+  const held = await combinedInput(1, 1),
+    finance = await person("finance"),
+    before = await snapshot();
+  await expect(execute(held, finance)).rejects.toThrow(/Denied/);
+  expect(await snapshot()).toEqual(before);
+  const empty = await combinedInput();
+  expect((await execute(empty, finance)).data.verification.payments).toHaveLength(3);
+});
+
+it("v2 rolls cancellation and all three cash rows back on a late failure", async () => {
+  const p = await combinedInput(2, 2),
+    before = await snapshot();
+  await owner(
+    "create function private.synthetic_combined_failure() returns trigger language plpgsql as $$ begin raise exception 'SyntheticCombinedLateFailure'; end $$; create trigger synthetic_combined_failure before insert on cimac_apartment_paid_reservations for each row execute function private.synthetic_combined_failure()",
+  );
+  try {
+    await expect(execute(p)).rejects.toThrow(/SyntheticCombinedLateFailure/);
+  } finally {
+    await owner(
+      "drop trigger synthetic_combined_failure on cimac_apartment_paid_reservations; drop function private.synthetic_combined_failure()",
+    );
+  }
+  expect(await snapshot()).toEqual(before);
+});
+
+it("v2 protects property money and period metadata against edits, source escape, deletion and fabrication", async () => {
+  const r = await execute(await combinedInput()),
+    before = await snapshot();
+  const property = r.data.verification.payments.find(
+    (x: Json) => x.source_type === "cimac_apartment_property_fee",
+  );
+  await login();
+  await expect(
+    db.query("update payments set source_type='manual',request_kind=null where id=$1", [
+      property.id,
+    ]),
+  ).rejects.toThrow(/PaidImmutable/);
+  await expect(db.query("delete from payments where id=$1", [property.id])).rejects.toThrow(
+    /PaidImmutable/,
+  );
+  await expect(
+    owner(
+      "update cimac_apartment_paid_reservations set property_period_end='2028-12-31' where id=$1",
+      [r.data.reservationIds[0]],
+    ),
+  ).rejects.toThrow(/PaidImmutable/);
+  await login();
+  await expect(
+    db.query(
+      "insert into payments(id,customer_id,unit_id,source_type,source_id,payment_date,amount,currency,exchange_rate_to_xof,payment_method,request_id) values($1,$2,$3,'cimac_apartment_property_fee',$4,'2026-11-17',1,'XOF',1,'cash',$5)",
+      [randomUUID(), property.customer_id, property.unit_id, property.source_id, randomUUID()],
+    ),
+  ).rejects.toThrow(/PaidMoneyDenied/);
+  expect(await snapshot()).toEqual(before);
+});
+
+it("v2 serializes a held-room exact retry without repeating cancellation or any cash row", async () => {
+  const p = await combinedInput(1, 1),
+    other = await cluster.connect();
+  try {
+    const [one, two] = await Promise.all([execute(p), execute(p, actor, other)]);
+    expect([one.idempotent, two.idempotent].sort()).toEqual([false, true]);
+    expect(one.data).toEqual(two.data);
+    expect(one.data.verification.payments).toHaveLength(3);
+    expect(one.data.verification.unpaidReservations).toHaveLength(1);
+    expect(one.data.verification.unpaidReservations[0].status).toBe("cancelled");
+  } finally {
+    await other.end();
+  }
 });

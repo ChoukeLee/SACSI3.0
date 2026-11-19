@@ -12,6 +12,7 @@ import {
   paidResult,
   paidScope,
 } from "./fixtures/cimac-apartment-paid";
+import { combinedInput, combinedResult } from "./fixtures/cimac-apartment-paid-v2";
 const rpc = vi.fn(),
   from = vi.fn();
 const client = { rpc, from } as unknown as SupabaseClient;
@@ -38,6 +39,37 @@ beforeEach(() => {
   });
 });
 describe("paid apartment authenticated service boundary", () => {
+  it("dispatches one combined receipt and retains its exact hold CAS and annual property fields", async () => {
+    rpc.mockResolvedValue({ data: combinedResult(), error: null });
+    const request = combinedInput();
+    expect(await executeApartmentPaid(client, paidScope, paidActor, request)).toMatchObject({
+      success: true,
+      totalAmountXof: 6330000,
+      roomCount: 3,
+    });
+    expect(rpc).toHaveBeenCalledExactlyOnceWith("cimac_apartment_paid_receipt_execute_rpc", {
+      p_request: request,
+    });
+  });
+  it("verifies combined-receipt status without issuing a second financial write", async () => {
+    rpc.mockResolvedValue({ data: combinedResult(), error: null });
+    expect(
+      await apartmentPaidStatus(client, paidScope, paidActor, combinedInput().requestId),
+    ).toMatchObject({ found: true, verified: false });
+    expect(rpc).toHaveBeenCalledExactlyOnceWith("cimac_apartment_paid_receipt_status_rpc", {
+      p_request_id: combinedInput().requestId,
+    });
+  });
+  it("returns a known 409 for an atomic hold CAS rejection, without disclosing database text", async () => {
+    rpc.mockResolvedValue({
+      data: null,
+      error: { message: "CimacApartmentPaidHoldChanged internal details", code: "P0001" },
+    });
+    await expect(
+      executeApartmentPaid(client, paidScope, paidActor, combinedInput()),
+    ).rejects.toMatchObject({ status: 409, message: "CimacApartmentPaidHoldChanged" });
+    expect(rpc).toHaveBeenCalledTimes(1);
+  });
   it("only dispatches the typed atomic RPC once and reconciles all raw rows", async () => {
     expect(await executeApartmentPaid(client, paidScope, paidActor, paidInput())).toMatchObject({
       success: true,

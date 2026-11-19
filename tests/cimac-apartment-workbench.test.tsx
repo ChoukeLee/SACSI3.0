@@ -171,10 +171,55 @@ describe("CIMAC apartment workbench", () => {
     expect(room("201").getAttribute("aria-label")).toContain("已付预订");
     expect(host.textContent).toContain("2027-03-31");
     expect(host.textContent).toContain("2028-12-31");
+    expect(host.textContent).toContain("已收物业费未登记");
+    expect(host.textContent).toContain("物业费已付期间未登记");
     expect(host.textContent).not.toContain("取消预留");
     expect(host.textContent).not.toContain("登记房间预留");
     expect(host.textContent).toContain("实际入住");
     expect(host.textContent).toContain("资料待补充");
+  });
+  it("shows the independently paid annual property period and full receipt amount without declaring actual occupancy", async () => {
+    const data = fixture();
+    data.reservationSchemaAvailable = true;
+    data.registeredCount = 64;
+    data.rooms = data.rooms.map((room) => ({
+      ...room,
+      registered: true,
+      unitId: `synthetic-${room.unitNo}`,
+      unitUpdatedAt: "2026-11-01T00:00:00Z",
+      constructionStatus: "operational",
+      operationalCondition: "normal",
+    }));
+    data.rooms[0].paidReservation = {
+      receiptId: "receipt",
+      reservationId: "paid",
+      customerName: "测试客户甲",
+      agreementStartDate: "2027-01-01",
+      agreementEndDate: "2028-12-31",
+      paidPeriodStart: "2027-01-01",
+      paidPeriodEnd: "2027-03-31",
+      paymentDate: "2026-11-19",
+      paymentMethod: "cash",
+      monthlyRentXof: 350000,
+      depositAmountXof: 700000,
+      rentAmountXof: 1050000,
+      propertyFeeAmountXof: 360000,
+      propertyPeriodStart: "2027-01-01",
+      propertyPeriodEnd: "2027-12-31",
+      totalAmountXof: 2110000,
+      sourceRef: "Synthetic cash receipt",
+      externalReceiptNo: "TEST-ANNUAL-01",
+    };
+    await render({ data, initialQuery: { floor: 2, suffix: 1, tab: "room" } });
+    expect(host.textContent).toContain("已收押金、首季租金及物业费");
+    expect(host.textContent).toContain("预付租金至2027-03-31");
+    expect(host.textContent).toContain("已收物业费36万 XOF");
+    expect(host.textContent).toContain("物业费已付期间2027-01-01 — 2027-12-31");
+    expect(host.textContent).toContain("本房实收合计211万 XOF");
+    expect(host.textContent).toContain("2028-12-31");
+    expect(host.textContent).toContain("实际入住");
+    expect(host.textContent).toContain("资料待补充");
+    expect(host.textContent).not.toContain("已入住");
   });
   it("shows delivery, booking and actual stay independently for a ready 64-room catalogue", async () => {
     const data = fixture();
@@ -550,7 +595,7 @@ describe("CIMAC apartment workbench", () => {
     expect(host.textContent).toContain("2个月押金 + 3个月租金 + 完整1年物业费");
     expect(host.textContent).not.toContain("6个月");
     expect(host.textContent).toContain("收费测算，不代表应收或已收款");
-    expect(host.textContent).toContain("待确认，不套用商铺年度");
+    expect(host.textContent).toContain("按各合同及收据确认，不套用商铺年度");
     expect(host.textContent).toContain("折算方式待确认");
     expect(mocks.initialize).not.toHaveBeenCalled();
   });

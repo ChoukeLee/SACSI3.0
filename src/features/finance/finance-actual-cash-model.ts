@@ -55,6 +55,7 @@ const receiptSources = new Set([
   "lease_contract",
   "cimac_apartment_rent",
   "cimac_apartment_deposit",
+  "cimac_apartment_property_fee",
   "sale",
   "sale_contract",
   "property_fee",

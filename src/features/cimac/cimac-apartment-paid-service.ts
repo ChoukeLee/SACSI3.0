@@ -16,6 +16,7 @@ const errors = new Set([
   "DuplicateTarget",
   "Denied",
   "ScopeChanged",
+  "HoldChanged",
   "BusinessConflict",
   "CustomerConflict",
   "RequestConflict",

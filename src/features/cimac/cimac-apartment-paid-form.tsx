@@ -6,6 +6,7 @@ import type { Locale } from "@/lib/i18n";
 import type { CimacApartmentRoom } from "./cimac-apartment-model";
 import {
   parseApartmentPaidRequest,
+  paidAnnualEnd,
   paidQuarterEnd,
   type ApartmentPaidRequest,
 } from "./cimac-apartment-paid-model";
@@ -58,7 +59,7 @@ async function digest(request: ApartmentPaidRequest) {
 }
 const amount = (n: number) => `${new Intl.NumberFormat("zh-CN").format(n)} XOF（${n / 10000}万）`;
 
-/** One physical receipt, explicitly split into deposit and prepaid rent for each room. */
+/** One physical receipt with explicitly received components for each room. */
 export function CimacApartmentPaidForm({
   rooms,
   selectedUnitId,
@@ -75,14 +76,15 @@ export function CimacApartmentPaidForm({
       r.registered &&
       r.unitId &&
       r.unitUpdatedAt &&
-      !r.reservation &&
+      (!r.reservation || r.reservation.status === "reserved") &&
       !r.paidReservation &&
       r.constructionStatus === "operational" &&
       r.operationalCondition === "normal" &&
       r.occupancyState !== "occupied",
   );
   const [open, setOpen] = useState(false),
-    [chosen, setChosen] = useState<string[]>([selectedUnitId]);
+    [chosen, setChosen] = useState<string[]>([selectedUnitId]),
+    [includePropertyFee, setIncludePropertyFee] = useState(false);
   const [review, setReview] = useState<ApartmentPaidRequest | null>(null),
     [marker, setMarker] = useState<Marker | null>(null);
   const [loaded, setLoaded] = useState(false),
@@ -94,7 +96,11 @@ export function CimacApartmentPaidForm({
     guard = useRef(false),
     mounted = useRef(true);
   const activeRooms = eligible.filter((r) => chosen.includes(r.unitId!));
-  const total = activeRooms.reduce((sum, r) => sum + r.monthlyRentXof * 5, 0);
+  const total = activeRooms.reduce(
+    (sum, r) =>
+      sum + r.monthlyRentXof * 5 + (includePropertyFee ? r.monthlyPropertyFeeXof * 12 : 0),
+    0,
+  );
   useEffect(() => {
     mounted.current = true;
     setMarker(stored(key));
@@ -106,16 +112,25 @@ export function CimacApartmentPaidForm({
   function prepare(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setError("");
+    if (!includePropertyFee && activeRooms.some((room) => room.reservation)) {
+      setError(
+        zh
+          ? "这些房间已有未付款预订。仅在实际收据含首年物业费时勾选；暂不支持仅收押租的预订转换。"
+          : "Ces logements ont une réservation non payée. Ne cochez les charges annuelles que si elles figurent sur le reçu. Leur conversion avec seulement dépôt et loyer n’est pas encore disponible.",
+      );
+      return;
+    }
     try {
       const form = new FormData(event.currentTarget),
         get = (k: string) => String(form.get(k) ?? "").trim();
       const start = get("agreementStartDate"),
         external = get("externalReceiptNo");
       const input = parseApartmentPaidRequest({
+        ...(includePropertyFee ? { schemaVersion: 2 } : {}),
         requestId: crypto.randomUUID(),
         originalInstruction: zh
-          ? "按核对页明确登记一位客户多房同一收据已收押金及预付租金；约定租期不代表实际入住。"
-          : "Enregistrer le dépôt et le loyer prépayé d’un reçu unique ; aucune entrée réelle n’est déclarée.",
+          ? "按核对页登记一位客户多房同一收据中的实际已收分项；所选旧未付款预留按本次付款归属转换并保留历史；约定租期不代表实际入住。"
+          : "Enregistrer les montants réellement reçus d’un reçu unique ; remplacer les blocages non payés sélectionnés en conservant leur historique. Le séjour réel reste à confirmer.",
         customerName: get("customerName"),
         agreementStartDate: start,
         agreementEndDate: get("agreementEndDate"),
@@ -131,21 +146,28 @@ export function CimacApartmentPaidForm({
         rooms: activeRooms.map((r) => ({
           unitId: r.unitId,
           expectedUnitUpdatedAt: r.unitUpdatedAt,
-          expectedHoldId: null,
-          expectedHoldUpdatedAt: null,
+          expectedHoldId: r.reservation?.id ?? null,
+          expectedHoldUpdatedAt: r.reservation?.updatedAt ?? null,
           monthlyRentXof: r.monthlyRentXof,
           depositMonths: 2,
           rentPrepayMonths: 3,
           depositAmountXof: r.monthlyRentXof * 2,
           rentAmountXof: r.monthlyRentXof * 3,
+          ...(includePropertyFee
+            ? {
+                propertyFeeAmountXof: r.monthlyPropertyFeeXof * 12,
+                propertyPeriodStart: start,
+                propertyPeriodEnd: paidAnnualEnd(start),
+              }
+            : {}),
         })),
       });
       setReview(input);
     } catch {
       setError(
         zh
-          ? "请核对必填资料、完整月租期、付款日期及实际收据总额；押2付3合计必须相符。"
-          : "Vérifiez les champs, dates et total réel du reçu (dépôt 2 mois + loyer 3 mois).",
+          ? "请核对必填资料、账期、付款日期及实际收据总额；总额须与勾选的已收分项相符。"
+          : "Vérifiez les champs, périodes, date et total réel du reçu, qui doit correspondre aux montants reçus sélectionnés.",
       );
     }
   }
@@ -245,8 +267,8 @@ export function CimacApartmentPaidForm({
       <h3>{zh ? "已收押租预订" : "Réservation payée"}</h3>
       <p>
         {zh
-          ? "一位客户、多间房、一张收据。仅登记押金和首季租金；物业费另行核实。约定起租不表示实际入住。"
-          : "Un client, plusieurs logements, un reçu : dépôt et premier trimestre. Charges séparées ; l’entrée réelle reste à confirmer."}
+          ? "一位客户、多间房、一张收据。按实际收款登记押金、首季租金和已确认的一年物业费；约定起租不表示实际入住。"
+          : "Un client, plusieurs logements, un reçu : dépôt, premier trimestre et charges annuelles confirmées. L’entrée réelle reste à confirmer."}
       </p>
       {!open && !marker ? (
         <button
@@ -280,11 +302,7 @@ export function CimacApartmentPaidForm({
       {open && !marker && !review ? (
         <form onSubmit={prepare} className={styles.paidFields}>
           <fieldset>
-            <legend>
-              {zh
-                ? "选择房间（须先取消旧未付款预留）"
-                : "Logements (annuler les anciens blocages non payés)"}
-            </legend>
+            <legend>{zh ? "选择房间" : "Choisir les logements"}</legend>
             <div className={styles.paidRoomChoices}>
               {eligible.map((r) => (
                 <label key={r.unitId}>
@@ -298,6 +316,11 @@ export function CimacApartmentPaidForm({
                     }
                   />
                   {r.unitNo}
+                  {r.reservation
+                    ? zh
+                      ? ` · 原预订人：${r.reservation.reserverName}（未付款）`
+                      : ` · Réservataire précédent : ${r.reservation.reserverName} (non payé)`
+                    : ""}
                 </label>
               ))}
             </div>
@@ -329,9 +352,27 @@ export function CimacApartmentPaidForm({
             </select>
           </label>
           <p>
-            {zh ? "所选房间押2付3测算：" : "Estimation dépôt 2 mois + loyer 3 mois : "}
+            {zh ? "所选房间已收分项合计：" : "Total des montants reçus sélectionnés : "}
             {amount(total)}
           </p>
+          <label>
+            <input
+              type="checkbox"
+              name="includePropertyFee"
+              checked={includePropertyFee}
+              onChange={(event) => setIncludePropertyFee(event.target.checked)}
+            />
+            {zh
+              ? "本次还收到合同首年物业费（完整12个月）"
+              : "Charges de la première année également reçues (12 mois complets)"}
+          </label>
+          {includePropertyFee ? (
+            <p>
+              {zh
+                ? "物业费期间从约定起租日开始，完整12个月；下一步逐房核对金额及起止日期。"
+                : "Les charges couvrent 12 mois complets à partir du début convenu. Vérifiez les dates et montants par logement à l’étape suivante."}
+            </p>
+          ) : null}
           <label>
             {zh ? "实际收据总额（西法元，不是万）" : "Montant réel du reçu (XOF, unité entière)"}
             <input
@@ -382,8 +423,34 @@ export function CimacApartmentPaidForm({
             <p key={r.unitId}>
               {rooms.find((x) => x.unitId === r.unitId)?.unitNo} · {zh ? "押金" : "Dépôt"}{" "}
               {amount(r.depositAmountXof)} + {zh ? "租金" : "Loyer"} {amount(r.rentAmountXof)}
+              {r.propertyFeeAmountXof !== undefined ? (
+                <>
+                  {" "}
+                  + {zh ? "物业费" : "Charges"} {amount(r.propertyFeeAmountXof)} (
+                  {r.propertyPeriodStart} — {r.propertyPeriodEnd})
+                </>
+              ) : null}
             </p>
           ))}
+          {review.rooms.some((r) => r.expectedHoldId) ? (
+            <div>
+              <p>
+                {zh
+                  ? "下列未付款预留将按本次收据转为已付预订，原记录保留："
+                  : "Ces blocages non payés seront remplacés par la réservation payée ; leur historique est conservé :"}
+              </p>
+              {review.rooms
+                .filter((r) => r.expectedHoldId)
+                .map((r) => {
+                  const room = rooms.find((candidate) => candidate.unitId === r.unitId);
+                  return (
+                    <p key={r.unitId}>
+                      {room?.unitNo} · {room?.reservation?.reserverName} → {review.customerName}
+                    </p>
+                  );
+                })}
+            </div>
+          ) : null}
           <p>
             {review.paymentDate} ·{" "}
             {
