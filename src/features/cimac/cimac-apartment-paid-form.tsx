@@ -112,6 +112,14 @@ export function CimacApartmentPaidForm({
   function prepare(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setError("");
+    if (!includePropertyFee && activeRooms.some((room) => room.reservation)) {
+      setError(
+        zh
+          ? "这些房间已有未付款预订。仅在实际收据含首年物业费时勾选；暂不支持仅收押租的预订转换。"
+          : "Ces logements ont une réservation non payée. Ne cochez les charges annuelles que si elles figurent sur le reçu. Leur conversion avec seulement dépôt et loyer n’est pas encore disponible.",
+      );
+      return;
+    }
     try {
       const form = new FormData(event.currentTarget),
         get = (k: string) => String(form.get(k) ?? "").trim();

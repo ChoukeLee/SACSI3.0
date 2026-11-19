@@ -170,7 +170,15 @@ describe("paid receipt review and recovery UI", () => {
     };
     await render(value);
     await review();
-    expect(host.querySelector('[role="alert"]')).not.toBeNull();
+    expect(host.querySelector('[role="alert"]')?.textContent).toContain(
+      "仅在实际收据含首年物业费时勾选",
+    );
+    expect(host.querySelector('[role="alert"]')?.textContent).toContain(
+      "暂不支持仅收押租的预订转换",
+    );
+    expect(host.querySelector<HTMLInputElement>('[name="includePropertyFee"]')?.checked).toBe(
+      false,
+    );
     expect(mocks.execute).not.toHaveBeenCalled();
     expect(host.textContent).not.toContain("确认登记已收押租");
   });

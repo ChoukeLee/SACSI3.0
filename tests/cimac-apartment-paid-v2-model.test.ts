@@ -15,10 +15,136 @@ import {
   paidResult,
 } from "./fixtures/cimac-apartment-paid";
 import { combinedInput, combinedResult } from "./fixtures/cimac-apartment-paid-v2";
+import { cimacApartmentPlan } from "@/features/cimac/cimac-apartment-model";
+
+/** Exercise the real 64-room catalog, including the higher-priced two-bedroom rows. */
+function catalogReceipt(count: number) {
+  const raw = combinedResult(false),
+    input = combinedInput(false),
+    v = raw.data.verification;
+  const plans = cimacApartmentPlan().slice(0, count),
+    roomTemplate = input.rooms[0];
+  const unitTemplate = v.units[0],
+    reservationTemplate = v.reservations[0],
+    paymentTemplate = v.payments[0],
+    ledgerTemplate = v.ledger[0];
+  input.rooms = plans.map((p, i) => ({
+    ...roomTemplate,
+    unitId: paidId(1000 + i),
+    monthlyRentXof: p.monthlyRentXof,
+    depositAmountXof: p.monthlyRentXof * 2,
+    rentAmountXof: p.monthlyRentXof * 3,
+    propertyFeeAmountXof: p.monthlyPropertyFeeXof * 12,
+  }));
+  input.totalAmountXof = input.rooms.reduce(
+    (s, r) => s + r.depositAmountXof + r.rentAmountXof + r.propertyFeeAmountXof!,
+    0,
+  );
+  raw.data.request = input;
+  v.receipt.total_amount_xof = input.totalAmountXof;
+  v.units = input.rooms.map((r, i) => ({
+    ...unitTemplate,
+    id: r.unitId,
+    code: `CIMAC-B17-${plans[i].unitNo}`,
+    unit_no: plans[i].unitNo,
+    floor_label: `${plans[i].floor}F`,
+  }));
+  v.profiles = input.rooms.map((r, i) => ({
+    unit_id: r.unitId,
+    building_id: paidBuilding,
+    floor_number: plans[i].floor,
+    room_suffix: plans[i].suffix,
+    bedrooms: plans[i].bedrooms,
+    facing: plans[i].facing,
+    monthly_rent_xof: r.monthlyRentXof,
+    monthly_property_fee_xof: plans[i].monthlyPropertyFeeXof,
+    deposit_months: 2,
+    rent_prepay_months: 6,
+    property_prepay_months: 12,
+  }));
+  v.reservations = input.rooms.map((r, i) => ({
+    ...reservationTemplate,
+    id: paidId(2000 + i),
+    unit_id: r.unitId,
+    monthly_rent_xof: r.monthlyRentXof,
+    deposit_amount_xof: r.depositAmountXof,
+    rent_amount_xof: r.rentAmountXof,
+    property_fee_amount_xof: r.propertyFeeAmountXof,
+    deposit_payment_id: paidId(3000 + i * 3),
+    rent_payment_id: paidId(3001 + i * 3),
+    property_payment_id: paidId(3002 + i * 3),
+  }));
+  v.payments = input.rooms.flatMap((r, i) =>
+    ["deposit", "rent", "property_fee"].map((kind, j) => ({
+      ...paymentTemplate,
+      id: paidId(3000 + i * 3 + j),
+      unit_id: r.unitId,
+      source_id: v.reservations[i].id,
+      source_type: `cimac_apartment_${kind}`,
+      amount:
+        kind === "deposit"
+          ? r.depositAmountXof
+          : kind === "rent"
+            ? r.rentAmountXof
+            : r.propertyFeeAmountXof,
+      request_id: i === 0 && j === 0 ? input.requestId : paidId(5000 + i * 3 + j),
+      receipt_no: `WB-CIMAC-B17-L-${plans[i].unitNo}-${input.paymentDate.replaceAll("-", "")}-${kind === "deposit" ? "DEP" : kind === "rent" ? "RENT" : "PROP"}-01`,
+    })),
+  );
+  v.ledger = v.payments.map((p: any, i: number) => ({
+    ...ledgerTemplate,
+    id: paidId(4000 + i),
+    unit_id: p.unit_id,
+    payment_id: p.id,
+    amount_xof: p.amount,
+    direction: i % 3 === 0 ? "liability_in" : "income",
+    category: i % 3 === 0 ? "lease_deposit" : i % 3 === 1 ? "lease_rent" : "property_fee",
+  }));
+  raw.data.reservationIds = v.reservations.map((r: any) => r.id);
+  raw.data.paymentIds = v.payments.map((p: any) => p.id);
+  raw.data.ledgerIds = v.ledger.map((l: any) => l.id);
+  v.unpaidReservationsBefore = [];
+  v.unpaidReservations = [];
+  return { raw, input, numbers: new Map(input.rooms.map((r, i) => [r.unitId, plans[i].unitNo])) };
+}
 
 const verify = (r: unknown, input = combinedInput()) =>
   verifyApartmentPaidResult(r, input, paidActor, paidProject, paidBuilding, paidNos());
 describe("versioned apartment deposit/rent/annual-property receipts", () => {
+  it.each([43, 64])(
+    "verifies all %s rooms with exactly three payment/ledger rows per room",
+    (count) => {
+      const { raw, input, numbers } = catalogReceipt(count);
+      expect(parseApartmentPaidRequest(input)).toEqual(input);
+      expect(raw.data.verification.payments).toHaveLength(count * 3);
+      expect(raw.data.verification.ledger).toHaveLength(count * 3);
+      expect(
+        verifyApartmentPaidResult(raw, input, paidActor, paidProject, paidBuilding, numbers),
+      ).toMatchObject({ success: true, roomCount: count, totalAmountXof: input.totalAmountXof });
+      const read = readApartmentPaidRows(
+        {
+          buildingId: paidBuilding,
+          receipts: [raw.data.verification.receipt],
+          reservations: raw.data.verification.reservations,
+        },
+        paidProject,
+        paidBuilding,
+        numbers,
+      );
+      expect(read.size).toBe(count);
+    },
+  );
+  it.each(["payments", "ledger"])(
+    "rejects an extra %s evidence row beyond the exact 64-room split count",
+    (field) => {
+      const { raw, input, numbers } = catalogReceipt(64),
+        evidence = raw.data.verification[field];
+      evidence.push({ ...evidence[0], id: paidId(9900) });
+      expect(() =>
+        verifyApartmentPaidResult(raw, input, paidActor, paidProject, paidBuilding, numbers),
+      ).toThrowError(expect.objectContaining({ status: 503 }));
+    },
+  );
   it("retains a single physical receipt with three exact classifications for each room", () => {
     const input = parseApartmentPaidRequest(combinedInput()),
       raw = combinedResult();

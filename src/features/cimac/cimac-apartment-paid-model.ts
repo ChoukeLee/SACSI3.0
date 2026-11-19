@@ -558,8 +558,8 @@ export function verifyApartmentPaidResult(
       buildingId,
       unitNos,
     );
-  const payments = indexed(rows(v.payments)),
-    ledger = indexed(rows(v.ledger)),
+  const payments = indexed(rows(v.payments, n * splitCount)),
+    ledger = indexed(rows(v.ledger, n * splitCount)),
     units = indexed(rows(v.units, 64)),
     profiles = indexed(rows(v.profiles, 64), "unit_id");
   if (
