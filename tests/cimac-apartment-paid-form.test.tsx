@@ -55,6 +55,12 @@ function button(label: string) {
 async function click(label: string) {
   await act(async () => button(label).click());
 }
+async function confirmReceipt(label = "确认登记已收押租") {
+  await act(async () => {
+    button(label).click();
+    await vi.waitFor(() => expect(mocks.execute).toHaveBeenCalledOnce());
+  });
+}
 function fill(name: string, value: string) {
   const el = host.querySelector<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>(
     `[name="${name}"]`,
@@ -112,7 +118,7 @@ describe("paid receipt review and recovery UI", () => {
     expect(host.textContent).toContain("2027-03-31");
     expect(host.textContent).toContain("所选房间显示为已入住");
     expect(host.textContent).not.toMatch(/入住.*待补充|入住日期|不会替代入住登记/);
-    await click("确认登记已收押租");
+    await confirmReceipt();
     expect(mocks.execute).toHaveBeenCalledTimes(1);
     expect(mocks.execute.mock.calls[0][0]).toMatchObject({
       ...input,
@@ -137,7 +143,7 @@ describe("paid receipt review and recovery UI", () => {
     expect(host.textContent).not.toMatch(/entrée réelle|séjour réel|à compléter séparément/i);
     expect(host.textContent).toContain("2027-01-01 — 2028-12-31");
     expect(host.textContent).toContain("2027-01-01 — 2027-03-31");
-    await click("Confirmer le reçu");
+    await confirmReceipt("Confirmer le reçu");
     expect(host.querySelector('[role="status"]')?.textContent).toContain("Occupé");
     expect(mocks.execute.mock.calls[0][0]).toMatchObject({
       agreementStartDate: input.agreementStartDate,
@@ -163,7 +169,7 @@ describe("paid receipt review and recovery UI", () => {
     expect(host.textContent).toContain(`原预订人 → ${input.customerName}`);
     expect(host.textContent).toContain("原记录保留");
     expect(host.textContent).toContain("6,330,000 XOF（633万）");
-    await click("确认登记已收押租");
+    await confirmReceipt();
     expect(mocks.execute).toHaveBeenCalledOnce();
     const actual = mocks.execute.mock.calls[0][0];
     expect(actual).toMatchObject({ schemaVersion: 2, totalAmountXof: 6330000 });
@@ -212,7 +218,7 @@ describe("paid receipt review and recovery UI", () => {
       .mockResolvedValueOnce({ success: true });
     await render();
     await review();
-    await click("确认登记已收押租");
+    await confirmReceipt();
     const original = mocks.execute.mock.calls[0][0],
       marker = JSON.parse(sessionStorage.getItem(key)!);
     expect(marker).toEqual({
@@ -232,7 +238,7 @@ describe("paid receipt review and recovery UI", () => {
       .mockResolvedValueOnce({ success: false, outcome: "rejected", error: "Denied now" });
     await render();
     await review();
-    await click("确认登记已收押租");
+    await confirmReceipt();
     await click("原样重试");
     expect(sessionStorage.getItem(key)).not.toBeNull();
     expect(host.textContent).toContain("查询原请求");
