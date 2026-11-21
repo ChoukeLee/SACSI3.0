@@ -137,8 +137,11 @@ describe("CIMAC apartment workbench", () => {
     expect(host.textContent).not.toContain("暂无预订");
     expect(host.textContent).not.toContain("登记房间预留");
     expect(host.textContent).toContain("已付预订资料尚未核实");
+    expect(host.querySelector('[data-testid="apartment-stay-summary"]')?.textContent).toContain(
+      "暂无入住统计",
+    );
   });
-  it("shows paid reservation and paid-through independently and removes unpaid cancel controls", async () => {
+  it("counts a legacy paid reservation as occupied and preserves paid-through information", async () => {
     const data = fixture();
     data.reservationSchemaAvailable = true;
     data.registeredCount = 64;
@@ -169,16 +172,19 @@ describe("CIMAC apartment workbench", () => {
     };
     await render({ data, initialQuery: { floor: 2, suffix: 1, tab: "room" } });
     expect(room("201").getAttribute("aria-label")).toContain("已付预订");
+    expect(room("201").getAttribute("aria-label")).toContain("已入住");
+    expect(host.querySelector('[data-testid="apartment-stay-summary"]')?.textContent).toContain(
+      "1套已入住",
+    );
     expect(host.textContent).toContain("2027-03-31");
     expect(host.textContent).toContain("2028-12-31");
     expect(host.textContent).toContain("已收物业费未登记");
     expect(host.textContent).toContain("物业费已付期间未登记");
     expect(host.textContent).not.toContain("取消预留");
     expect(host.textContent).not.toContain("登记房间预留");
-    expect(host.textContent).toContain("实际入住");
-    expect(host.textContent).toContain("资料待补充");
+    expect(host.textContent).not.toMatch(/实际入住|入住日期/);
   });
-  it("shows the independently paid annual property period and full receipt amount without declaring actual occupancy", async () => {
+  it("marks a future paid booking as occupied immediately while preserving the receipt and coverage dates", async () => {
     const data = fixture();
     data.reservationSchemaAvailable = true;
     data.registeredCount = 64;
@@ -216,12 +222,17 @@ describe("CIMAC apartment workbench", () => {
     expect(host.textContent).toContain("已收物业费36万 XOF");
     expect(host.textContent).toContain("物业费已付期间2027-01-01 — 2027-12-31");
     expect(host.textContent).toContain("本房实收合计211万 XOF");
-    expect(host.textContent).toContain("2028-12-31");
-    expect(host.textContent).toContain("实际入住");
-    expect(host.textContent).toContain("资料待补充");
-    expect(host.textContent).not.toContain("已入住");
+    expect(host.textContent).toContain("约定租期2027-01-01 — 2028-12-31");
+    expect(host.textContent).toContain("实际收款日2026-11-19");
+    expect(host.querySelector('[aria-label="房间状态"]')?.textContent).toContain("入住已入住");
+    expect(
+      host
+        .querySelector('[data-testid="apartment-mobile-plan"] [data-room="201"]')
+        ?.getAttribute("aria-label"),
+    ).toContain("已入住");
+    expect(host.textContent).not.toMatch(/实际入住|预计入住|入住日期|实际住户/);
   });
-  it("shows delivery, booking and actual stay independently for a ready 64-room catalogue", async () => {
+  it("keeps unpaid bookings out of the occupied count for a ready catalogue", async () => {
     const data = fixture();
     data.reservationSchemaAvailable = true;
     data.registeredCount = 64;
@@ -258,22 +269,19 @@ describe("CIMAC apartment workbench", () => {
     expect(booking).toContain("53");
     expect(booking).toContain("已预订");
     expect(booking).toContain("暂无预订");
-    expect(stay).toContain("64");
-    expect(stay).toContain("资料待补充");
+    expect(stay).toContain("0套已入住");
     const states = host.querySelector('[aria-label="房间状态"]')!.textContent;
     expect(states).toContain("交付条件可交付");
     expect(states).toContain("预订情况已预订");
     expect(
       host.querySelector('[aria-label="选中房间详情"] [title="Synthetic Booker 0"]')?.textContent,
     ).toContain("Synthetic Booker 0");
-    expect(states).toContain("实际入住资料待补充");
+    expect(states).not.toContain("入住");
     expect(room("201").getAttribute("aria-label")).toMatch(
-      /交付.*可交付.*预订.*Synthetic Booker 0.*入住.*资料待补充/,
+      /交付.*可交付.*预订.*Synthetic Booker 0$/,
     );
-    expect(room("216").getAttribute("aria-label")).toMatch(
-      /交付.*可交付.*预订.*暂无预订.*入住.*资料待补充/,
-    );
-    expect(host.textContent).not.toMatch(/业务占用待核|64套待核|已入住|空房|空置率/);
+    expect(room("216").getAttribute("aria-label")).toMatch(/交付.*可交付.*预订.*暂无预订$/);
+    expect(host.textContent).not.toMatch(/入住日期|实际住户|空房|空置率/);
     expect(mocks.executeReservation).not.toHaveBeenCalled();
   });
 
@@ -315,7 +323,7 @@ describe("CIMAC apartment workbench", () => {
     expect(room("205").getAttribute("aria-label")).not.toContain("可交付");
   });
 
-  it("shows named unpaid reservations separately from actual residents and unknown occupancy", async () => {
+  it("shows named unpaid reservations and their pending lease term without an occupancy prompt", async () => {
     const data = fixture();
     data.reservationSchemaAvailable = true;
     data.registeredCount = 2;
@@ -356,12 +364,10 @@ describe("CIMAC apartment workbench", () => {
     const info = host.querySelector("#apartment-room-info")!.textContent;
     expect(info).toContain(`预订人${fullName}`);
     expect(info).toContain("预留付款未付款");
-    expect(info).toContain("预计入住日期待定");
     expect(info).toContain("租期待定");
-    expect(info).toContain("实际住户待补充");
-    expect(info).toContain("入住日期待补充");
-    expect(host.querySelector('[data-testid="apartment-stay-summary"]')?.textContent).toMatch(
-      /64.*待补充/,
+    expect(info).not.toMatch(/预计入住|入住日期|实际住户/);
+    expect(host.querySelector('[data-testid="apartment-stay-summary"]')?.textContent).toContain(
+      "0套已入住",
     );
     expect(host.textContent).not.toContain("入住率");
     expect(button("更正预订人")).not.toBeNull();
@@ -424,7 +430,7 @@ describe("CIMAC apartment workbench", () => {
     expect(button("登记房间预留")).not.toBeNull();
   });
 
-  it("localizes reservation names, unpaid state and pending dates in French", async () => {
+  it("localizes reservation names and unpaid state in French", async () => {
     const data = fixture();
     data.reservationSchemaAvailable = true;
     data.registeredCount = 1;
@@ -446,8 +452,7 @@ describe("CIMAC apartment workbench", () => {
     const info = host.querySelector("#apartment-room-info")!.textContent;
     expect(info).toContain("RéservataireSynthetic Réservataire");
     expect(info).toContain("Paiement de la réservationNon payé");
-    expect(info).toContain("Arrivée prévueÀ préciser");
-    expect(info).toContain("Résident réelÀ compléter");
+    expect(info).not.toMatch(/Arrivée prévue|Résident réel|Date d’entrée/);
     expect(button("Corriger le réservataire")).not.toBeNull();
   });
 
@@ -456,8 +461,8 @@ describe("CIMAC apartment workbench", () => {
     expect(host.textContent).toContain("房间总数64套");
     expect(host.textContent).toContain("52套一室一厅 / 12套两室");
     expect(host.textContent).toContain("资产建档 0 / 64");
-    expect(host.querySelector('[data-testid="apartment-stay-summary"]')?.textContent).toMatch(
-      /64.*待补充/,
+    expect(host.querySelector('[data-testid="apartment-stay-summary"]')?.textContent).toContain(
+      "暂无入住统计",
     );
     expect(host.textContent).toContain("资产记录尚未建立");
     expect(host.textContent).not.toMatch(/入住率|空置率|已入住|已收租金|已收物业|0%/);
@@ -600,12 +605,11 @@ describe("CIMAC apartment workbench", () => {
     expect(mocks.initialize).not.toHaveBeenCalled();
   });
 
-  it("keeps unsupplied resident, merchant, occupancy dates and areas pending", async () => {
+  it("keeps other room facts pending without displaying separate resident or move-in fields", async () => {
     await render({ initialQuery: { floor: 2, suffix: 16, tab: "room" } });
     const info = host.querySelector("#apartment-room-info")!;
-    expect(info.textContent).toContain("实际住户待补充");
+    expect(info.textContent).not.toMatch(/实际住户|入住日期/);
     expect(info.textContent).toContain("关联商户待补充");
-    expect(info.textContent).toContain("入住日期待补充");
     expect(info.textContent).toContain("租金起算日待核实");
     expect(info.textContent).toContain("面积待核实");
     expect(host.querySelector('[aria-label="房间状态"]')?.textContent).toContain(
@@ -732,7 +736,7 @@ describe("CIMAC apartment workbench", () => {
     expect(mocks.initialize.mock.calls[0][0]).not.toBe("bad request");
   });
 
-  it("labels business occupation distinctly from real residents and provides the registered asset return path", async () => {
+  it("preserves contract or daily-booking linkage separately from paid occupancy", async () => {
     const data = fixture();
     data.reservationSchemaAvailable = true;
     data.registeredCount = 2;
@@ -756,19 +760,16 @@ describe("CIMAC apartment workbench", () => {
       occupancyState: "unoccupied",
     };
     await render({ data, initialQuery: { floor: 2, suffix: 1, tab: "room" } });
-    expect(room("201").getAttribute("aria-label")).toMatch(
-      /预订.*Synthetic Future Booker.*入住.*资料待补充/,
-    );
-    expect(room("202").getAttribute("aria-label")).toMatch(/暂无预订.*入住.*资料待补充/);
+    expect(room("201").getAttribute("aria-label")).toMatch(/预订.*Synthetic Future Booker$/);
+    expect(room("202").getAttribute("aria-label")).toMatch(/暂无预订$/);
     expect(host.querySelector("#apartment-room-info")?.textContent).toContain(
       "关联业务存在占用业务",
     );
-    expect(host.querySelector("#apartment-room-info")?.textContent).toContain("实际住户待补充");
     const link = new URL(host.querySelector("a")!.href);
     expect(link.pathname).toBe("/cimac/assets/asset-201");
     expect(link.searchParams.get("returnTo")).toBe("/cimac/apartments?floor=2&room=201&tab=room");
     expect(host.textContent).not.toContain("入住率");
-    expect(host.textContent).not.toMatch(/已入住|现场空置/);
+    expect(host.querySelector('[aria-label="房间状态"]')?.textContent).not.toContain("入住");
     await click(room("202"));
     expect(host.querySelector("#apartment-room-info")?.textContent).toContain(
       "关联业务已核实无占用业务",
@@ -796,7 +797,7 @@ describe("CIMAC apartment workbench", () => {
     expect(host.textContent).toContain("XOF · dépôt 2 mois · loyer 3 mois · charges annuelles");
     expect(host.textContent).not.toContain("6 mois");
     expect(host.textContent).toContain("Prorata à confirmer");
-    expect(host.querySelector("#apartment-room-info")?.textContent).toContain(
+    expect(host.querySelector("#apartment-room-info")?.textContent).not.toContain(
       "Résident réelÀ compléter",
     );
     const link = new URL(host.querySelector("a")!.href);

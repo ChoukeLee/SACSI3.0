@@ -133,7 +133,8 @@ describe("unpaid apartment reservation form", () => {
     expect(document.activeElement).toBe(host.querySelector("input"));
     expect(host.querySelectorAll("input")).toHaveLength(1);
     expect(host.querySelector("textarea")).toBeNull();
-    expect(host.textContent).toContain("未付款 · 入住日期与租期待定");
+    expect(host.textContent).toContain("未付款 · 租期待定");
+    expect(host.textContent).not.toContain("入住日期");
     await fill("input", "  Synthetic Tenant  ");
     await submit();
     const request = mocks.execute.mock.calls[0][0] as CimacApartmentReservationRequest;
@@ -145,7 +146,7 @@ describe("unpaid apartment reservation form", () => {
         expectedReservationId: null,
         expectedReservationUpdatedAt: null,
         reserverName: "Synthetic Tenant",
-        reason: "按页面明确指令登记房间预留；未付款，入住日期和租期待定。",
+        reason: "按页面明确指令登记房间预留；未付款，租期待定。",
       },
     ]);
     expect(request.requestId).toMatch(/^[0-9a-f-]{36}$/);
@@ -153,7 +154,8 @@ describe("unpaid apartment reservation form", () => {
     expect(request.operations[0]).not.toHaveProperty("checkIn");
     expect(mocks.refresh).toHaveBeenCalledOnce();
     expect(sessionStorage.getItem(storageKey)).toBeNull();
-    expect(host.querySelector('[role="status"]')?.textContent).toContain("实际入住与账务未改动");
+    expect(host.querySelector('[role="status"]')?.textContent).toContain("账务未改动");
+    expect(host.textContent).not.toContain("实际入住");
     expect(button("登记预留").disabled).toBe(true);
   });
 
@@ -313,7 +315,8 @@ describe("unpaid apartment reservation form", () => {
     expect(host.textContent).toBe("");
     await render(fixture(), "fr");
     await click("Réserver ce logement");
-    expect(host.textContent).toContain("Non payé · arrivée et durée à préciser");
+    expect(host.textContent).toContain("Non payé · durée à préciser");
+    expect(host.textContent).not.toContain("arrivée");
     expect(host.querySelector("label")?.textContent).toContain("Réservataire");
     expect(host.querySelector('input[type="date"]')).toBeNull();
     expect(mocks.execute).not.toHaveBeenCalled();

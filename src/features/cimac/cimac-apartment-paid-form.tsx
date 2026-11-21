@@ -129,8 +129,8 @@ export function CimacApartmentPaidForm({
         ...(includePropertyFee ? { schemaVersion: 2 } : {}),
         requestId: crypto.randomUUID(),
         originalInstruction: zh
-          ? "按核对页登记一位客户多房同一收据中的实际已收分项；所选旧未付款预留按本次付款归属转换并保留历史；约定租期不代表实际入住。"
-          : "Enregistrer les montants réellement reçus d’un reçu unique ; remplacer les blocages non payés sélectionnés en conservant leur historique. Le séjour réel reste à confirmer.",
+          ? "按核对页登记一位客户多房同一收据中的实际已收分项；所选旧未付款预留按本次付款归属转换并保留历史；已付款房间显示为已入住。"
+          : "Enregistrer les montants réellement reçus d’un reçu unique ; remplacer les blocages non payés sélectionnés en conservant leur historique. Les logements payés sont affichés « Occupé ».",
         customerName: get("customerName"),
         agreementStartDate: start,
         agreementEndDate: get("agreementEndDate"),
@@ -254,21 +254,21 @@ export function CimacApartmentPaidForm({
       <section className={styles.reservationForm}>
         <p role="status">
           {zh
-            ? "已收押租预订已核验保存，房间资料正在刷新；实际入住仍待补充。"
-            : "Réservation payée vérifiée ; actualisation en cours. Entrée réelle à compléter."}
+            ? "收款已核验保存，房间显示为已入住。"
+            : "Encaissement vérifié et enregistré. Logement affiché « Occupé »."}
         </p>
       </section>
     );
   return (
     <section
       className={styles.reservationForm}
-      aria-label={zh ? "已收押租预订" : "Réservation payée"}
+      aria-label={zh ? "公寓收款" : "Encaissement d’appartement"}
     >
-      <h3>{zh ? "已收押租预订" : "Réservation payée"}</h3>
+      <h3>{zh ? "公寓收款" : "Encaissement d’appartement"}</h3>
       <p>
         {zh
-          ? "一位客户、多间房、一张收据。按实际收款登记押金、首季租金和已确认的一年物业费；约定起租不表示实际入住。"
-          : "Un client, plusieurs logements, un reçu : dépôt, premier trimestre et charges annuelles confirmées. L’entrée réelle reste à confirmer."}
+          ? "一位客户、多间房、一张收据。按实际收款登记押金、首季租金和已确认的一年物业费；已付款房间显示为已入住。"
+          : "Un client, plusieurs logements, un reçu : dépôt, premier trimestre et charges annuelles confirmées. Les logements payés sont affichés « Occupé »."}
       </p>
       {!open && !marker ? (
         <button
@@ -436,8 +436,8 @@ export function CimacApartmentPaidForm({
             <div>
               <p>
                 {zh
-                  ? "下列未付款预留将按本次收据转为已付预订，原记录保留："
-                  : "Ces blocages non payés seront remplacés par la réservation payée ; leur historique est conservé :"}
+                  ? "下列未付款预留将按本次收据转为已入住，原记录保留："
+                  : "Ces blocages non payés seront mis à jour vers « Occupé » selon ce reçu ; leur historique est conservé :"}
               </p>
               {review.rooms
                 .filter((r) => r.expectedHoldId)
@@ -475,8 +475,8 @@ export function CimacApartmentPaidForm({
           <p>{review.reason}</p>
           <p>
             {zh
-              ? "实际入住仍待补充。确认后不会替代入住登记。"
-              : "L’entrée réelle reste à compléter séparément."}
+              ? "收款登记后，所选房间显示为已入住。"
+              : "Après enregistrement du paiement, les logements sélectionnés sont affichés « Occupé »."}
           </p>
           <div className={styles.reservationButtons}>
             <button type="button" disabled={busy} onClick={() => setReview(null)}>

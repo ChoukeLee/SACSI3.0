@@ -32,7 +32,7 @@ function rooms(): CimacApartmentRoom[] {
     paidReservation: null,
   }));
 }
-async function render(value = rooms()) {
+async function render(value = rooms(), locale: "zh" | "fr" = "zh") {
   await act(async () =>
     root.render(
       <CimacApartmentPaidForm
@@ -40,7 +40,7 @@ async function render(value = rooms()) {
         selectedUnitId={input.rooms[0].unitId}
         projectId={paidProject}
         buildingId={paidBuilding}
-        locale="zh"
+        locale={locale}
       />,
     ),
   );
@@ -55,14 +55,20 @@ function button(label: string) {
 async function click(label: string) {
   await act(async () => button(label).click());
 }
+async function confirmReceipt(label = "确认登记已收押租") {
+  await act(async () => {
+    button(label).click();
+    await vi.waitFor(() => expect(mocks.execute).toHaveBeenCalledOnce());
+  });
+}
 function fill(name: string, value: string) {
   const el = host.querySelector<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>(
     `[name="${name}"]`,
   )!;
   el.value = value;
 }
-async function review(total = "5250000", includePropertyFee = false) {
-  await click("登记已收押租");
+async function review(total = "5250000", includePropertyFee = false, locale: "zh" | "fr" = "zh") {
+  await click(locale === "zh" ? "登记已收押租" : "Enregistrer le dépôt et loyer reçus");
   await act(async () => {
     for (const el of [
       ...host.querySelectorAll<HTMLInputElement>('fieldset input[type="checkbox"]'),
@@ -110,8 +116,9 @@ describe("paid receipt review and recovery UI", () => {
     expect(host.textContent).toContain("700,000 XOF（70万）");
     expect(host.textContent).toContain("1,050,000 XOF（105万）");
     expect(host.textContent).toContain("2027-03-31");
-    expect(host.textContent).toContain("实际入住仍待补充");
-    await click("确认登记已收押租");
+    expect(host.textContent).toContain("所选房间显示为已入住");
+    expect(host.textContent).not.toMatch(/入住.*待补充|入住日期|不会替代入住登记/);
+    await confirmReceipt();
     expect(mocks.execute).toHaveBeenCalledTimes(1);
     expect(mocks.execute.mock.calls[0][0]).toMatchObject({
       ...input,
@@ -120,6 +127,7 @@ describe("paid receipt review and recovery UI", () => {
     });
     expect(sessionStorage.getItem(key)).toBeNull();
     expect(mocks.refresh).toHaveBeenCalledOnce();
+    expect(host.querySelector('[role="status"]')?.textContent).toContain("房间显示为已入住");
   });
   it("rejects entering ten-thousand units instead of XOF units", async () => {
     await render();
@@ -127,6 +135,22 @@ describe("paid receipt review and recovery UI", () => {
     expect(host.querySelector('[role="alert"]')).not.toBeNull();
     expect(mocks.execute).not.toHaveBeenCalled();
     expect(host.textContent).not.toContain("确认登记已收押租");
+  });
+  it("uses Occupé for paid rooms in French while preserving the agreed contract and rent periods", async () => {
+    await render(rooms(), "fr");
+    await review("5250000", false, "fr");
+    expect(host.textContent).toContain("Occupé");
+    expect(host.textContent).not.toMatch(/entrée réelle|séjour réel|à compléter séparément/i);
+    expect(host.textContent).toContain("2027-01-01 — 2028-12-31");
+    expect(host.textContent).toContain("2027-01-01 — 2027-03-31");
+    await confirmReceipt("Confirmer le reçu");
+    expect(host.querySelector('[role="status"]')?.textContent).toContain("Occupé");
+    expect(mocks.execute.mock.calls[0][0]).toMatchObject({
+      agreementStartDate: input.agreementStartDate,
+      agreementEndDate: input.agreementEndDate,
+      paidPeriodStart: input.paidPeriodStart,
+      paidPeriodEnd: input.paidPeriodEnd,
+    });
   });
   it("reviews annual property fees and converts only the exact selected unpaid holds with the same receipt", async () => {
     const value = rooms();
@@ -145,7 +169,7 @@ describe("paid receipt review and recovery UI", () => {
     expect(host.textContent).toContain(`原预订人 → ${input.customerName}`);
     expect(host.textContent).toContain("原记录保留");
     expect(host.textContent).toContain("6,330,000 XOF（633万）");
-    await click("确认登记已收押租");
+    await confirmReceipt();
     expect(mocks.execute).toHaveBeenCalledOnce();
     const actual = mocks.execute.mock.calls[0][0];
     expect(actual).toMatchObject({ schemaVersion: 2, totalAmountXof: 6330000 });
@@ -194,7 +218,7 @@ describe("paid receipt review and recovery UI", () => {
       .mockResolvedValueOnce({ success: true });
     await render();
     await review();
-    await click("确认登记已收押租");
+    await confirmReceipt();
     const original = mocks.execute.mock.calls[0][0],
       marker = JSON.parse(sessionStorage.getItem(key)!);
     expect(marker).toEqual({
@@ -214,7 +238,7 @@ describe("paid receipt review and recovery UI", () => {
       .mockResolvedValueOnce({ success: false, outcome: "rejected", error: "Denied now" });
     await render();
     await review();
-    await click("确认登记已收押租");
+    await confirmReceipt();
     await click("原样重试");
     expect(sessionStorage.getItem(key)).not.toBeNull();
     expect(host.textContent).toContain("查询原请求");
