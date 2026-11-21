@@ -115,12 +115,10 @@ export function CimacApartmentReservationForm({ room, projectId, buildingId, loc
         zh ? "请填写修改或取消理由，最多2000字。" : "Précisez le motif, 2 000 caractères maximum.",
       );
     const annotation =
-      mode === "reserve"
-        ? "按页面明确指令登记房间预留；未付款，入住日期和租期待定。"
-        : trimmedReason;
+      mode === "reserve" ? "按页面明确指令登记房间预留；未付款，租期待定。" : trimmedReason;
     const originalInstruction =
       mode === "reserve"
-        ? `建材城17栋${room.unitNo}预留给${trimmedName}；未付款，入住日期和租期待定。`
+        ? `建材城17栋${room.unitNo}预留给${trimmedName}；未付款，租期待定。`
         : mode === "cancel"
           ? `取消建材城17栋${room.unitNo}的房间预留。理由：${trimmedReason}`
           : `将建材城17栋${room.unitNo}的预订人更正为${trimmedName}。理由：${trimmedReason}`;
@@ -207,8 +205,8 @@ export function CimacApartmentReservationForm({ room, projectId, buildingId, loc
       setSaved(true);
       setNotice(
         zh
-          ? "预留记录已核验保存，实际入住与账务未改动。"
-          : "Réservation vérifiée et enregistrée ; séjour réel et comptabilité inchangés.",
+          ? "预留记录已核验保存，账务未改动。"
+          : "Réservation vérifiée et enregistrée ; comptabilité inchangée.",
       );
       router.refresh();
     } catch (failure) {
@@ -350,9 +348,7 @@ export function CimacApartmentReservationForm({ room, projectId, buildingId, loc
                   : "Corriger le réservataire"}
           </h3>
           <p className={styles.small}>
-            {zh
-              ? "未付款 · 入住日期与租期待定；预留不表示已入住。"
-              : "Non payé · arrivée et durée à préciser ; réservation sans séjour réel."}
+            {zh ? "未付款 · 租期待定。" : "Non payé · durée à préciser."}
           </p>
           {mode !== "cancel" ? (
             <label htmlFor={`${inputId}-name`}>
