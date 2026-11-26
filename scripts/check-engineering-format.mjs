@@ -4,6 +4,8 @@ import * as prettier from "prettier";
 // A reviewed, explicit adoption scope. Legacy files are added when refactored;
 // this avoids burying meaningful business changes under a repository-wide reflow.
 const files = [
+  "tests/daily-discount-clear.test.tsx",
+  "tests/daily-discount-clear.native.ts",
   "src/features/management/rental-first-dashboard.tsx",
   "src/features/management/rental-first-dashboard.module.css",
   "src/features/management/rental-first-data.ts",

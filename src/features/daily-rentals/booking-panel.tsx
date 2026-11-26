@@ -441,14 +441,22 @@ export function BookingPanel({
   };
 
   const handleDiscount = async () => {
-    const amt = toN(discountAmount);
-    if (amt <= 0) return;
+    const amt = Number(discountAmount);
+    if (!discountAmount.trim() || !Number.isSafeInteger(amt) || amt < 0) return;
     await runPanelAction(
       () =>
         applyDiscount({
           bookingId: booking!.id,
           amount: amt,
-          reason: discountReason || (locale === "zh" ? "手动优惠" : "Remise manuelle"),
+          reason:
+            discountReason.trim() ||
+            (amt === 0
+              ? locale === "zh"
+                ? "撤销优惠，恢复原价"
+                : "Annulation de la remise"
+              : locale === "zh"
+                ? "手动优惠"
+                : "Remise manuelle"),
         }),
       { closeOnSuccess: true, clearAdvancedTask: true },
     );
@@ -1739,9 +1747,16 @@ export function BookingPanel({
 
                                   {activeAdvancedTask === "discount" && (
                                     <div className="space-y-2">
+                                      <p className="text-xs text-foreground/70">
+                                        {locale === "zh"
+                                          ? `当前优惠 ${formatXof(Number(booking.manual_discount_amount_xof ?? 0))}；输入 0 可撤销优惠，恢复原价。`
+                                          : `Remise actuelle : ${formatXof(Number(booking.manual_discount_amount_xof ?? 0))}. Saisissez 0 pour l’annuler.`}
+                                      </p>
                                       <div className="grid grid-cols-2 gap-2">
                                         <input
                                           type="number"
+                                          min={0}
+                                          step={1}
                                           value={discountAmount}
                                           onChange={(e) => setDiscountAmount(e.target.value)}
                                           className={inputClass}
@@ -1760,12 +1775,19 @@ export function BookingPanel({
                                         size="sm"
                                         onClick={handleDiscount}
                                         disabled={
-                                          saving || (parseInt(discountAmount, 10) || 0) <= 0
+                                          saving ||
+                                          !discountAmount.trim() ||
+                                          !Number.isSafeInteger(Number(discountAmount)) ||
+                                          Number(discountAmount) < 0
                                         }
                                         className="w-full"
                                       >
                                         <Percent className="h-3 w-3 mr-1" />
-                                        {t.applyDiscount}
+                                        {discountAmount.trim() && Number(discountAmount) === 0
+                                          ? locale === "zh"
+                                            ? "撤销优惠，恢复原价"
+                                            : "Annuler la remise"
+                                          : t.applyDiscount}
                                       </Button>
                                     </div>
                                   )}
