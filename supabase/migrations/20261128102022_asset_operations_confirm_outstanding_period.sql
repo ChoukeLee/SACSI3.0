@@ -52,7 +52,6 @@ begin
   original_balance := lease.evidence->'outstanding';
   if not found or asset.verification <> 'verified' or asset.unit_id is not null
      or lease.evidence->>'selfUse' = 'true'
-     or lease.evidence->>'blockReceiptCutoff' = 'true'
      or coalesce(lease.evidence->'ownerSettlement','null'::jsonb) <> 'null'::jsonb
      or coalesce(lease.evidence->'ownerRentAccount','null'::jsonb) <> 'null'::jsonb
      or coalesce(lease.evidence->'billingGroup','null'::jsonb) <> 'null'::jsonb

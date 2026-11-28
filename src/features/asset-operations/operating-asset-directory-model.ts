@@ -437,7 +437,6 @@ export function canReviewOperatingAssetOutstanding(asset: OperatingAssetDirector
     !!evidence?.outstanding &&
     isAssetDate(evidence.reviewedOn) &&
     !evidence.selfUse &&
-    !evidence.blockReceiptCutoff &&
     !evidence.ownerRentAccount &&
     !evidence.ownerSettlement &&
     !evidence.billingGroup &&

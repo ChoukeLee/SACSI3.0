@@ -212,6 +212,7 @@ describe("operating asset directory", () => {
       assetSourceRef: workbookSource,
       reviewedOn: "2026-11-10",
       paidThrough: { date: "2026-08-31", sourceRef: octoberSource },
+      blockReceiptCutoff: true,
       outstanding: openingBalance,
       nextPayment: { dueDate: "2026-11-27", sourceRef: "reviewed deadline", unpaid: true },
     };
