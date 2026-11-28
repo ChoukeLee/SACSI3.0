@@ -114,6 +114,7 @@ function directoryRow(
         (leaseBrowse &&
           (classifyOperatingLeaseMode(asset) === "whole" || isIncubatorDormitory(asset)) &&
           !followUp.ownerRent &&
+          !followUp.settledOutstanding &&
           !followUp.dueDate)));
   return {
     ...view,

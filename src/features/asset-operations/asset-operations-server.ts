@@ -13,6 +13,7 @@ import {
   type OperatingAssetLeaseEvidence,
   type OperatingAssetLeaseGroup,
   type OperatingAssetReferenceRent,
+  type OperatingAssetReviewedOutstanding,
   type OperatingAssetTenantEvidence,
 } from "./operating-asset-directory-model";
 
@@ -47,6 +48,20 @@ function readAmount(value: unknown): {
   )
     throw new Error("AssetOperationsReadUnavailable");
   return { amountNative, currency, sourceRef };
+}
+
+function readOutstanding(value: unknown): OperatingAssetReviewedOutstanding {
+  const amount = readAmount(value);
+  if (!isRecord(value)) return amount;
+  const { periodStart, periodEnd, dueDate } = value;
+  if (!isAssetDate(periodStart) || !isAssetDate(periodEnd) || periodStart > periodEnd)
+    return amount;
+  return {
+    ...amount,
+    periodStart,
+    periodEnd,
+    ...(isAssetDate(dueDate) ? { dueDate } : {}),
+  };
 }
 
 function readRent(value: unknown): OperatingAssetReferenceRent {
@@ -211,7 +226,7 @@ function readLeaseEvidence(value: unknown, reviewedOn: unknown): OperatingAssetL
     reviewedOn,
     referenceRent: referenceRent == null ? undefined : readRent(referenceRent),
     rates: rates?.map(readRent),
-    outstanding: outstanding == null ? undefined : readAmount(outstanding),
+    outstanding: outstanding == null ? undefined : readOutstanding(outstanding),
     tenantEvidence: readTenantEvidence(value.tenantEvidence),
     billingGroup: readBillingGroup(value.billingGroup),
     leaseGroups: readLeaseGroups(value.leaseGroups),

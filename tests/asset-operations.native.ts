@@ -67,6 +67,14 @@ const source = (projectId: string, assets = [row()]) => ({
   sourceFingerprint: "a".repeat(64),
   assets,
 });
+async function confirmOutstandingPeriod(input: unknown, request = randomUUID(), client = db) {
+  return (
+    await client.query(
+      "select public.asset_operations_confirm_outstanding_period_rpc($1,$2) value",
+      [input, request],
+    )
+  ).rows[0].value;
+}
 async function write(operation: string, input: unknown, request = randomUUID(), client = db) {
   return (
     await client.query("select public.asset_operations_write_rpc($1,$2,$3) value", [
@@ -343,6 +351,189 @@ it("restricts reviewed lease evidence to authorized readers of the parent asset"
   await owner("select set_config('request.jwt.claims','{}',false)");
   await db.query("set role anon");
   await expect(db.query(readEvidence)).rejects.toMatchObject({ code: "42501" });
+});
+
+async function reviewedOutstanding(extraAsset = {}, otherEvidence = {}) {
+  const f = await seed();
+  const asset = await verified(f, extraAsset);
+  const evidence = {
+    assetSourceRef: row().sourceRefs[0],
+    outstanding: { amountNative: 1_600_000, currency: "XOF", sourceRef: "Reviewed balance" },
+    paidThrough: { date: "2026-10-31", sourceRef: "Previous paid period" },
+    nextPayment: { dueDate: "2026-11-10", unpaid: true, sourceRef: "Reviewed due date" },
+    notes: ["Original reviewed source note"],
+    ...otherEvidence,
+  };
+  const reviewedOn = "2026-11-09";
+  await owner(
+    `insert into public.asset_operation_lease_evidence(asset_id,evidence,reviewed_on,batch_id)
+     values ($1,$2,$3,$4)`,
+    [asset.id, evidence, reviewedOn, randomUUID()],
+  );
+  await login(f.actor);
+  return {
+    f,
+    asset,
+    evidence,
+    input: {
+      assetId: asset.id,
+      expectedOutstanding: evidence.outstanding,
+      expectedReviewedOn: reviewedOn,
+      periodStart: "2026-11-01",
+      periodEnd: "2026-11-30",
+      reason: "The original rent statement confirms this period for the reviewed balance",
+    },
+  };
+}
+
+it("confirms a reviewed outstanding period with an audit and preserves the original evidence and cash", async () => {
+  const { f, asset, evidence, input } = await reviewedOutstanding();
+  await write(
+    "create_entry",
+    entry(asset, { category: "rent", currency: "XOF", amountNative: 1_600_000 }),
+  );
+  const original = await read(f.project);
+  const request = randomUUID();
+  const withDueDate = { ...input, dueDate: evidence.nextPayment.dueDate };
+  expect(await confirmOutstandingPeriod(withDueDate, request)).toEqual({
+    success: true,
+    idempotent: false,
+    data: { assetId: asset.id },
+  });
+  expect((await confirmOutstandingPeriod(withDueDate, request)).idempotent).toBe(true);
+  await expect(
+    confirmOutstandingPeriod({ ...withDueDate, reason: "Different reason" }, request),
+  ).rejects.toThrow("requestIdConflict");
+  expect((await read(f.project)).entries).toEqual(original.entries);
+  expect((await read(f.project)).assets).toEqual(original.assets);
+
+  const expected = {
+    ...evidence,
+    outstanding: {
+      ...evidence.outstanding,
+      periodStart: input.periodStart,
+      periodEnd: input.periodEnd,
+      dueDate: evidence.nextPayment.dueDate,
+    },
+  };
+  const audit = await owner(
+    `select actor_id,before_data,after_data,metadata->>'reason' reason
+       from public.audit_logs where entity_id=$1
+       and action='asset_operations_confirm_outstanding_period'`,
+    [asset.id],
+  );
+  expect(audit.rows).toEqual([
+    { actor_id: f.actor, before_data: evidence, after_data: expected, reason: input.reason },
+  ]);
+  await login(f.actor);
+  const revised = (
+    await db.query("select evidence from public.asset_operation_lease_evidence where asset_id=$1", [
+      asset.id,
+    ])
+  ).rows[0].evidence;
+  expect(revised).toEqual(expected);
+
+  await expect(confirmOutstandingPeriod(input)).rejects.toThrow("assetOperationRecordChanged");
+  await confirmOutstandingPeriod({
+    ...input,
+    expectedOutstanding: expected.outstanding,
+    periodEnd: "2026-12-31",
+  });
+  const corrected = (
+    await db.query("select evidence from public.asset_operation_lease_evidence where asset_id=$1", [
+      asset.id,
+    ])
+  ).rows[0].evidence;
+  expect(corrected).toEqual({
+    ...evidence,
+    outstanding: {
+      ...evidence.outstanding,
+      periodStart: input.periodStart,
+      periodEnd: "2026-12-31",
+    },
+  });
+});
+
+it("rejects unverifiable or stale outstanding period changes and only commits one concurrent revision", async () => {
+  const { f, input } = await reviewedOutstanding();
+  for (const correction of [
+    { periodStart: "2026-10-31" },
+    { periodStart: "2026-11-31" },
+    { periodEnd: "2026-10-31" },
+    { dueDate: "2026-11-09" },
+    { reason: "  " },
+  ]) {
+    await expect(confirmOutstandingPeriod({ ...input, ...correction })).rejects.toThrow(
+      "invalidAssetOutstandingPeriod",
+    );
+  }
+  await expect(
+    confirmOutstandingPeriod({ ...input, expectedReviewedOn: "2026-11-08" }),
+  ).rejects.toThrow("assetOperationRecordChanged");
+  await expect(
+    confirmOutstandingPeriod({
+      ...input,
+      expectedOutstanding: { ...input.expectedOutstanding, amountNative: 1 },
+    }),
+  ).rejects.toThrow("assetOperationRecordChanged");
+
+  const concurrent = await cluster.connect();
+  try {
+    await login(f.actor, concurrent);
+    const responses = await Promise.allSettled([
+      confirmOutstandingPeriod(input),
+      confirmOutstandingPeriod({ ...input, periodEnd: "2026-12-31" }, randomUUID(), concurrent),
+    ]);
+    expect(responses.filter((item) => item.status === "fulfilled")).toHaveLength(1);
+    const failed = responses.find((item) => item.status === "rejected");
+    expect(failed?.reason).toMatchObject({ message: "assetOperationRecordChanged" });
+  } finally {
+    await concurrent.end();
+  }
+});
+
+it("requires permission for both period updates and replay and excludes nonstandalone evidence", async () => {
+  const { f, asset, input } = await reviewedOutstanding();
+  const request = randomUUID();
+  await confirmOutstandingPeriod(input, request);
+  await owner("update user_profiles set role='boss' where id=$1", [f.actor]);
+  await login(f.actor);
+  await expect(confirmOutstandingPeriod(input, request)).rejects.toThrow(
+    "assetOperationPermissionDenied",
+  );
+  await owner("update user_profiles set role='finance' where id=$1", [f.actor]);
+  await db.query("update projects set access_mode='restricted' where id=$1", [f.project]);
+  await login(f.actor);
+  await expect(confirmOutstandingPeriod(input, request)).rejects.toThrow(
+    "assetOperationAccessDenied",
+  );
+  await owner(
+    "insert into project_account_access(project_id,account_email,account_id) values($1,$2,$3)",
+    [f.project, `${f.actor}@test.invalid`, f.actor],
+  );
+  await login(f.actor);
+  expect((await confirmOutstandingPeriod(input, request)).idempotent).toBe(true);
+
+  await owner("update asset_operation_assets set unit_id=$2 where id=$1", [asset.id, f.unit]);
+  await login(f.actor);
+  await expect(confirmOutstandingPeriod(input)).rejects.toThrow(
+    "assetOutstandingPeriodUnavailable",
+  );
+  await owner("update asset_operation_assets set unit_id=null where id=$1", [asset.id]);
+  await db.query(
+    `update asset_operation_lease_evidence
+        set evidence=evidence||'{"billingGroup":{"primarySourceKey":"shared"}}'
+      where asset_id=$1`,
+    [asset.id],
+  );
+  await login(f.actor);
+  await expect(confirmOutstandingPeriod(input)).rejects.toThrow(
+    "assetOutstandingPeriodUnavailable",
+  );
+
+  await owner("select set_config('request.jwt.claims','{}',false)");
+  await db.query("set role anon");
+  await expect(confirmOutstandingPeriod(input)).rejects.toMatchObject({ code: "42501" });
 });
 
 it("links a canonical payment once, validates its ledger and does not repost the original receipt", async () => {

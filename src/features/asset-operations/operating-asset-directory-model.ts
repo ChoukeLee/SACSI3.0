@@ -33,6 +33,20 @@ interface OperatingAssetOutstanding {
   sourceRef: string;
 }
 
+export interface OperatingAssetReviewedOutstanding extends OperatingAssetOutstanding {
+  periodStart?: string;
+  periodEnd?: string;
+  dueDate?: string;
+}
+
+interface SettledOperatingAssetOutstanding extends OperatingAssetOutstanding {
+  periodStart: string;
+  periodEnd: string;
+  receiptEntryId: string;
+  receiptSourceRef: string;
+  cashDate: string;
+}
+
 export interface OperatingAssetMonthlyRentSchedule extends OperatingAssetOutstanding {
   firstDueDate: string;
 }
@@ -59,7 +73,7 @@ export interface OperatingAssetLeaseEvidence {
   rates?: readonly OperatingAssetReferenceRent[];
   paidThrough?: { date: string; sourceRef: string };
   nextPayment?: { dueDate: string; sourceRef: string; unpaid?: boolean };
-  outstanding?: OperatingAssetOutstanding;
+  outstanding?: OperatingAssetReviewedOutstanding;
   tenantEvidence?: OperatingAssetTenantEvidence;
   billingGroup?: OperatingAssetBillingGroup;
   leaseGroups?: readonly OperatingAssetLeaseGroup[];
@@ -338,6 +352,7 @@ export interface OperatingAssetFollowUp {
   dueDate: string | null;
   dueSourceRef: string | null;
   outstanding: OperatingAssetOutstanding | null;
+  settledOutstanding?: SettledOperatingAssetOutstanding;
   scheduledPeriods?: readonly ScheduledRentPeriod[];
   status: "overdue" | "upcoming" | "needs_evidence" | "current";
   reason:
@@ -412,6 +427,85 @@ function rentCoverage(
 
 function daysBetween(from: string, to: string) {
   return (Date.parse(`${to}T00:00:00Z`) - Date.parse(`${from}T00:00:00Z`)) / 86_400_000;
+}
+
+export function canReviewOperatingAssetOutstanding(asset: OperatingAssetDirectoryAsset) {
+  const evidence = asset.leaseEvidence;
+  return (
+    asset.verification === "verified" &&
+    asset.unitId === null &&
+    !!evidence?.outstanding &&
+    isAssetDate(evidence.reviewedOn) &&
+    !evidence.selfUse &&
+    !evidence.blockReceiptCutoff &&
+    !evidence.ownerRentAccount &&
+    !evidence.ownerSettlement &&
+    !evidence.billingGroup &&
+    !evidence.leaseGroups?.length &&
+    !asset.leaseGroups?.length &&
+    !asset.monthlyRentSchedule
+  );
+}
+
+function settleReviewedOutstanding(
+  asset: OperatingAssetDirectoryAsset,
+  entries: readonly OperatingAssetDirectoryEntry[],
+  today: string,
+): SettledOperatingAssetOutstanding | undefined {
+  const evidence = asset.leaseEvidence;
+  const balance = evidence?.outstanding;
+  if (!canReviewOperatingAssetOutstanding(asset) || !balance || !isAssetDate(evidence?.reviewedOn))
+    return;
+
+  const { periodStart, periodEnd, dueDate } = balance;
+  const { reviewedOn, paidThrough, nextPayment } = evidence;
+  const amountDue = minorUnits(balance.amountNative);
+  if (
+    amountDue === null ||
+    !isAssetDate(periodStart) ||
+    !isAssetDate(periodEnd) ||
+    periodEnd < periodStart ||
+    (paidThrough && paidThrough.date >= periodStart) ||
+    (dueDate != null && (dueDate !== nextPayment?.dueDate || nextPayment?.unpaid !== true)) ||
+    (nextPayment && nextPayment.dueDate <= periodEnd && nextPayment.dueDate !== dueDate)
+  )
+    return;
+
+  // An earlier receipt may already be reflected in the reviewed opening balance.
+  const matches = entries.filter((entry) => {
+    const cashDate = entry.cashDate;
+    if (
+      entry.assetId !== asset.id ||
+      entry.billingMemberAssetId ||
+      entry.status !== "verified" ||
+      (entry.sourceVerification ?? entry.verification) !== "verified" ||
+      entry.voidedAt ||
+      entry.kind !== "income" ||
+      entry.category !== "rent" ||
+      entry.currency !== balance.currency ||
+      !isAssetDate(cashDate) ||
+      cashDate <= reviewedOn ||
+      cashDate > today ||
+      entry.periodStart !== periodStart ||
+      entry.periodEnd !== periodEnd
+    )
+      return false;
+    const amountPaid = minorUnits(entry.amountNative);
+    return amountPaid !== null && amountPaid >= amountDue;
+  });
+  // Two independently sufficient matches need reconciliation before either is allocated.
+  const [receipt] = matches;
+  if (matches.length !== 1 || !receipt?.cashDate) return;
+  return {
+    amountNative: balance.amountNative,
+    currency: balance.currency,
+    sourceRef: balance.sourceRef,
+    periodStart,
+    periodEnd,
+    receiptEntryId: receipt.id,
+    receiptSourceRef: receipt.sourceRef,
+    cashDate: receipt.cashDate,
+  };
 }
 
 function scheduledRentFollowUp(
@@ -516,16 +610,41 @@ export function getOperatingAssetFollowUp(
   const evidence = asset.leaseEvidence;
   const schedule = asset.monthlyRentSchedule;
   const scheduled = schedule ? scheduledRentFollowUp(asset, entries, today, schedule) : null;
-  const paidThrough = scheduled ? scheduled.paidThrough : rentCoverage(asset, entries, today);
-  const nextPayment = scheduled ? scheduled.nextPayment : evidence?.nextPayment;
+  const settledOutstanding = scheduled
+    ? undefined
+    : settleReviewedOutstanding(asset, entries, today);
+  const balanceStart = evidence?.outstanding?.periodStart;
+  const balanceEnd = evidence?.outstanding?.periodEnd;
+  const blockedCoverage =
+    !settledOutstanding &&
+    canReviewOperatingAssetOutstanding(asset) &&
+    isAssetDate(balanceStart) &&
+    isAssetDate(balanceEnd) &&
+    balanceStart <= balanceEnd;
+  const coverageEntries = blockedCoverage
+    ? entries.filter((entry) => !isAssetDate(entry.periodEnd) || entry.periodEnd < balanceStart)
+    : entries;
+  const paidThrough = scheduled
+    ? scheduled.paidThrough
+    : rentCoverage(asset, coverageEntries, today);
+  const nextPayment = scheduled
+    ? scheduled.nextPayment
+    : settledOutstanding && evidence?.outstanding?.dueDate === evidence?.nextPayment?.dueDate
+      ? undefined
+      : evidence?.nextPayment;
   const dueDate = isAssetDate(nextPayment?.dueDate) ? nextPayment.dueDate : null;
-  const outstanding = scheduled ? scheduled.outstanding : (evidence?.outstanding ?? null);
+  const outstanding = scheduled
+    ? scheduled.outstanding
+    : settledOutstanding
+      ? null
+      : (evidence?.outstanding ?? null);
   const daysUntilDue = dueDate ? daysBetween(today, dueDate) : null;
   const facts = {
     paidThrough,
     dueDate,
     dueSourceRef: dueDate ? (nextPayment?.sourceRef ?? null) : null,
     outstanding,
+    ...(settledOutstanding ? { settledOutstanding } : {}),
     daysUntilDue,
     ...(scheduled ? { scheduledPeriods: scheduled.periods } : {}),
   };

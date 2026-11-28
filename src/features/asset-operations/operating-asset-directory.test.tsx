@@ -14,7 +14,11 @@ import {
 } from "./operating-asset-directory-model";
 
 const navigation = vi.hoisted(() => ({ push: vi.fn(), refresh: vi.fn() }));
+const reviewOutstandingPeriod = vi.hoisted(() => vi.fn());
 vi.mock("next/navigation", () => ({ useRouter: () => navigation }));
+vi.mock("./asset-operations-actions", () => ({
+  confirmAssetOperationOutstandingPeriod: reviewOutstandingPeriod,
+}));
 vi.mock("./owner-settlement-actions", () => ({
   getOwnerSettlementContext: vi.fn(),
   recordOwnerSettlement: vi.fn(),
@@ -82,6 +86,8 @@ afterEach(async () => {
   host.remove();
   window.localStorage.clear();
   navigation.push.mockClear();
+  navigation.refresh.mockClear();
+  reviewOutstandingPeriod.mockReset();
   vi.unstubAllGlobals();
 });
 
@@ -686,6 +692,137 @@ it("counts actionable whole rentals and keeps the selected filter after closing 
   await clickButton(host, "返回整体出租");
   expect(wholeCards()).toHaveLength(6);
   expect(document.activeElement).toBe(wholeCard("balance"));
+});
+
+it("displays an exactly matched rent balance as settled and retains its original and receipt evidence", async () => {
+  const factory = asset({
+    id: "settled-factory",
+    name: "测试厂房",
+    sourceKey: "industrial:settled-factory",
+    group: "厂房",
+    sourceRefs: ["测试厂房档案"],
+    verification: "verified",
+  });
+  const sourceRef = "原表第10行租金余款";
+  const receiptSourceRef = "收据 T-17";
+  const data = directory(
+    [factory],
+    [
+      entry({
+        assetId: factory.id,
+        cashDate: "2026-11-18",
+        amountNative: 16000000,
+        periodStart: "2026-11-01",
+        periodEnd: "2027-02-28",
+        verification: "verified",
+        sourceRef: receiptSourceRef,
+        description: "付清租金余款",
+      }),
+    ],
+    {
+      [factory.sourceKey!]: {
+        assetSourceRef: factory.sourceRefs[0],
+        reviewedOn: "2026-11-10",
+        paidThrough: { date: "2026-10-31", sourceRef: "上期收据" },
+        outstanding: {
+          currency: "XOF",
+          amountNative: 16000000,
+          periodStart: "2026-11-01",
+          periodEnd: "2027-02-28",
+          sourceRef,
+        },
+      },
+    },
+  );
+  await act(async () =>
+    root.render(
+      <OperatingAssetDirectory
+        data={{ ...data, canWrite: true }}
+        locale="zh"
+        today="2026-11-20"
+        category="all"
+        leaseCategory="whole"
+        browseViewerId="viewer-a"
+      />,
+    ),
+  );
+  expect(host.textContent).toContain("需跟进 0");
+  const card = host.querySelector<HTMLButtonElement>('ul[aria-label="整体出租资产"] button')!;
+  await act(async () => card.click());
+  const paymentPanel = host.querySelector('[aria-label="付款进度"]')!;
+  expect(factValues(paymentPanel, "待收租金")).toEqual([]);
+  expect(factValues(paymentPanel, "原表余款")).toEqual(["已结清 · 1,600 万西法"]);
+  await clickButton(host, "查看流水与资产档案");
+  const detail = dialog();
+  expect(factValues(detail, "原表登记未收")).toEqual([]);
+  expect(factValues(detail, "原表余款")).toEqual(["已结清 · 1,600 万西法"]);
+  await clickButton(detail, "资产档案");
+  expect(factValues(detail, "结清账期")).toEqual(["2026-11-01 — 2027-02-28"]);
+  expect(factValues(detail, "原表余款依据")).toEqual([sourceRef]);
+  expect(factValues(detail, "结清凭证")).toEqual(["2026-11-18 · 收据 T-17"]);
+  expect(detail.textContent).not.toContain("核实待收账期");
+});
+
+it("reuses the exact reviewed period request after an uncertain response", async () => {
+  const factory = asset({
+    id: "review-factory",
+    name: "待核账期厂房",
+    sourceKey: "industrial:review-factory",
+    group: "厂房",
+    sourceRefs: ["厂房档案"],
+    verification: "verified",
+  });
+  const outstanding = { currency: "XOF" as const, amountNative: 6000000, sourceRef: "原表第11行" };
+  const data = directory([factory], [], {
+    [factory.sourceKey!]: {
+      assetSourceRef: factory.sourceRefs[0],
+      reviewedOn: "2026-11-10",
+      paidThrough: { date: "2026-10-31", sourceRef: "上期收据" },
+      nextPayment: { dueDate: "2026-11-05", unpaid: true, sourceRef: "合同约定" },
+      outstanding,
+    },
+  });
+  reviewOutstandingPeriod.mockResolvedValueOnce({ ok: false }).mockResolvedValueOnce({ ok: true });
+  await act(async () =>
+    root.render(
+      <OperatingAssetDirectory
+        data={{ ...data, canWrite: true }}
+        locale="zh"
+        today="2026-11-20"
+        category="all"
+        leaseCategory="whole"
+        browseViewerId="viewer-a"
+      />,
+    ),
+  );
+  const card = host.querySelector<HTMLButtonElement>('ul[aria-label="整体出租资产"] button')!;
+  await act(async () => card.click());
+  await clickButton(host, "查看流水与资产档案");
+  const detail = dialog();
+  await clickButton(detail, "资产档案");
+  const form = detail.querySelector("form")!;
+  form.querySelector<HTMLInputElement>('[name="periodStart"]')!.value = "2026-11-01";
+  form.querySelector<HTMLInputElement>('[name="periodEnd"]')!.value = "2026-11-30";
+  form.querySelector<HTMLTextAreaElement>('[name="reason"]')!.value = "合同与原表均注明11月份";
+  const checkbox = form.querySelector<HTMLInputElement>('[name="includeDueDate"]')!;
+  expect(checkbox.checked).toBe(false);
+  checkbox.checked = true;
+  await clickButton(form, "保存账期");
+  const input = reviewOutstandingPeriod.mock.calls[0]?.[0];
+  expect(input).toEqual({
+    requestId: expect.any(String),
+    assetId: factory.id,
+    expectedReviewedOn: "2026-11-10",
+    expectedOutstanding: outstanding,
+    periodStart: "2026-11-01",
+    periodEnd: "2026-11-30",
+    dueDate: "2026-11-05",
+    reason: "合同与原表均注明11月份",
+  });
+  expect(checkbox.disabled).toBe(true);
+  await clickButton(form, "原样重试");
+  expect(reviewOutstandingPeriod).toHaveBeenNthCalledWith(2, input);
+  expect(navigation.refresh).toHaveBeenCalledTimes(1);
 });
 
 it("shows site counts alongside compact unit rows and keeps financial details accessible", async () => {

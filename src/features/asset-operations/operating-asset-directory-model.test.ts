@@ -193,6 +193,132 @@ describe("operating asset directory", () => {
     ).toBe("2027-01-31");
   });
 
+  describe("reviewed source rent balance", () => {
+    const today = "2026-11-28";
+    const factory = asset({
+      id: "factory-id",
+      sourceKey: "factory:example",
+      verification: "verified",
+    });
+    const openingBalance = {
+      amountNative: 16_000_000,
+      currency: "XOF",
+      sourceRef: "reviewed factory balance",
+      periodStart: "2026-09-01",
+      periodEnd: "2027-02-28",
+      dueDate: "2026-11-27",
+    } as const;
+    const evidence: OperatingAssetLeaseEvidence = {
+      assetSourceRef: workbookSource,
+      reviewedOn: "2026-11-10",
+      paidThrough: { date: "2026-08-31", sourceRef: octoberSource },
+      outstanding: openingBalance,
+      nextPayment: { dueDate: "2026-11-27", sourceRef: "reviewed deadline", unpaid: true },
+    };
+    const receipt = entry({
+      id: "tail-payment",
+      assetId: factory.id,
+      amountNative: 16_000_000,
+      cashDate: "2026-11-27",
+      periodStart: "2026-09-01",
+      periodEnd: "2027-02-28",
+      sourceRef: "receipt for reviewed balance",
+    });
+
+    function getFollowUp(
+      entries: Entry[],
+      source = evidence,
+      overrides?: Partial<AssetOperationAsset>,
+    ) {
+      const directory = buildOperatingAssetDirectory(
+        { projectId, assets: [{ ...factory, ...overrides }], entries, canWrite: true },
+        { ...options, includeCanonical: true, today, leaseEvidence: { "factory:example": source } },
+      );
+      return getOperatingAssetFollowUp(directory.assets[0], directory.entries, today);
+    }
+
+    it("marks only the matched original balance settled and retains the receipt and source", () => {
+      const earlierPart = { ...receipt, id: "opening-payment", cashDate: "2026-10-30" };
+      expect(getFollowUp([earlierPart, receipt])).toMatchObject({
+        status: "current",
+        paidThrough: { date: "2027-02-28", status: "verified" },
+        dueDate: null,
+        outstanding: null,
+        settledOutstanding: {
+          amountNative: 16_000_000,
+          currency: "XOF",
+          periodStart: "2026-09-01",
+          periodEnd: "2027-02-28",
+          sourceRef: openingBalance.sourceRef,
+          receiptEntryId: receipt.id,
+          receiptSourceRef: receipt.sourceRef,
+          cashDate: "2026-11-27",
+        },
+      });
+      expect(evidence.outstanding).toBe(openingBalance);
+      expect(getFollowUp([{ ...receipt, amountNative: 16_000_001 }]).outstanding).toBeNull();
+    });
+
+    it("reopens the original balance after its receipt is voided", () => {
+      const result = getFollowUp([{ ...receipt, voidedAt: "2026-11-28T12:30:00Z" }]);
+      expect(result).toMatchObject({
+        status: "overdue",
+        outstanding: openingBalance,
+        paidThrough: { date: "2026-08-31" },
+        dueDate: "2026-11-27",
+      });
+      expect(result.settledOutstanding).toBeUndefined();
+    });
+
+    it.each([
+      ["pending", { verification: "pending" }],
+      ["promoted workbook source", { verification: "pending", sourceRef: octoberSource }],
+      ["insufficient amount", { amountNative: 15_999_999 }],
+      ["other asset", { assetId: "elsewhere" }],
+      ["other currency", { currency: "USD", bookedAmountXof: 16_000_000 }],
+      ["other income", { category: "property_fee" }],
+      ["no cash receipt", { cashDate: null }],
+      ["already included in reviewed balance", { cashDate: "2026-11-10" }],
+      ["future cash date", { cashDate: "2026-11-29" }],
+      ["overlapping coverage", { periodStart: "2026-08-31" }],
+      ["different coverage end", { periodEnd: "2027-02-27" }],
+    ] as const)("preserves the balance for %s", (_reason, changes) => {
+      const result = getFollowUp([{ ...receipt, ...changes }]);
+      expect(result.outstanding).toEqual(openingBalance);
+      expect(result.paidThrough?.date).toBe("2026-08-31");
+      expect(result.settledOutstanding).toBeUndefined();
+    });
+
+    it("requires reviewed bounds and an unambiguous receipt, preserving unrelated due dates", () => {
+      expect(
+        getFollowUp([receipt], {
+          ...evidence,
+          outstanding: { ...openingBalance, periodEnd: undefined },
+        }).settledOutstanding,
+      ).toBeUndefined();
+      expect(
+        getFollowUp([receipt, { ...receipt, id: "another", sourceRef: "another receipt" }])
+          .settledOutstanding,
+      ).toBeUndefined();
+      expect(
+        getFollowUp([receipt], evidence, { unitId: "linked-unit" }).settledOutstanding,
+      ).toBeUndefined();
+      expect(
+        getFollowUp([receipt], {
+          ...evidence,
+          outstanding: { ...openingBalance, dueDate: undefined },
+          nextPayment: { dueDate: "2027-03-01", sourceRef: "next period", unpaid: true },
+        }),
+      ).toMatchObject({ outstanding: null, dueDate: "2027-03-01" });
+      expect(
+        getFollowUp([receipt], {
+          ...evidence,
+          outstanding: { ...openingBalance, dueDate: undefined },
+        }).settledOutstanding,
+      ).toBeUndefined();
+    });
+  });
+
   it("confirms Excel sources in the SACSI trial while retaining the original land evidence", () => {
     const original = asset();
     const originalReceipt = entry({

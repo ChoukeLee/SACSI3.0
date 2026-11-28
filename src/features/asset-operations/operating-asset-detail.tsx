@@ -1,12 +1,15 @@
 "use client";
 
-import { useId, useState } from "react";
+import { useId, useRef, useState, type FormEvent } from "react";
+import { useRouter } from "next/navigation";
 import { RightDrawer } from "@/components/ui/operational";
 import { RecordDetailTabs } from "@/components/ui/record-detail-tabs";
 import type { Locale } from "@/lib/i18n";
 import { formatPropertyMoney, formatPropertyXof } from "@/lib/property-money";
+import { confirmAssetOperationOutstandingPeriod } from "./asset-operations-actions";
 import { assetReportPeriod, assetSourceLabel, isAssetDate } from "./asset-operations-model";
 import {
+  canReviewOperatingAssetOutstanding,
   hasOperatingAssetLeaseEvidence,
   summarizeOperatingAssetCash,
   type OperatingAssetDirectoryAsset,
@@ -395,6 +398,138 @@ function AssetLeaseHistory({
   );
 }
 
+type OutstandingPeriodInput = Parameters<typeof confirmAssetOperationOutstandingPeriod>[0];
+
+function OutstandingPeriodReview({
+  assetId,
+  reviewedOn,
+  outstanding,
+  unpaidDueDate,
+  locale,
+}: {
+  assetId: string;
+  reviewedOn: string;
+  outstanding: OutstandingPeriodInput["expectedOutstanding"];
+  unpaidDueDate?: string;
+  locale: Locale;
+}) {
+  const zh = locale === "zh";
+  const router = useRouter();
+  const attempt = useRef<OutstandingPeriodInput | null>(null);
+  const guard = useRef(false);
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
+  const [unknown, setUnknown] = useState(false);
+  const [error, setError] = useState("");
+
+  async function submit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (guard.current || saved) return;
+    if (!attempt.current) {
+      const values = new FormData(event.currentTarget);
+      const periodStart = String(values.get("periodStart") ?? "");
+      const periodEnd = String(values.get("periodEnd") ?? "");
+      const reason = String(values.get("reason") ?? "").trim();
+      if (
+        !isAssetDate(periodStart) ||
+        !isAssetDate(periodEnd) ||
+        periodStart > periodEnd ||
+        !reason
+      ) {
+        setError(
+          zh ? "请填写有效的账期起止日和核实依据。" : "Vérifiez les dates et le justificatif.",
+        );
+        return;
+      }
+      attempt.current = {
+        assetId,
+        requestId: crypto.randomUUID(),
+        expectedReviewedOn: reviewedOn,
+        expectedOutstanding: outstanding,
+        periodStart,
+        periodEnd,
+        dueDate: values.has("includeDueDate") ? unpaidDueDate : undefined,
+        reason,
+      };
+    }
+    guard.current = true;
+    setSaving(true);
+    setError("");
+    try {
+      const result = await confirmAssetOperationOutstandingPeriod(attempt.current);
+      if (result.ok) {
+        setSaved(true);
+        setUnknown(false);
+        router.refresh();
+      } else if (result.rejected) {
+        attempt.current = null;
+        setUnknown(false);
+        setError(
+          zh
+            ? "未保存，刷新后核对原表待收、账期和核实依据。"
+            : "Enregistrement refusé. Actualisez et vérifiez le solde, la période et le justificatif.",
+        );
+      } else setUnknown(true);
+    } catch {
+      setUnknown(true);
+    } finally {
+      guard.current = false;
+      setSaving(false);
+    }
+  }
+
+  return (
+    <details className={styles.source}>
+      <summary>{zh ? "核实待收账期" : "Vérifier la période du solde"}</summary>
+      <form className={drawerStyles.settlementForm} onSubmit={submit}>
+        <fieldset className={drawerStyles.settlementFields} disabled={saving || saved || unknown}>
+          <label>
+            {zh ? "账期起始日" : "Début de la période"}
+            <input name="periodStart" type="date" defaultValue={outstanding.periodStart} required />
+          </label>
+          <label>
+            {zh ? "账期截止日" : "Fin de la période"}
+            <input name="periodEnd" type="date" defaultValue={outstanding.periodEnd} required />
+          </label>
+          <label>
+            {zh ? "核实依据" : "Justificatif"}
+            <textarea name="reason" required maxLength={2000} />
+          </label>
+        </fieldset>
+        {unpaidDueDate ? (
+          <label className="flex items-center gap-2">
+            <input
+              name="includeDueDate"
+              type="checkbox"
+              defaultChecked={unpaidDueDate === outstanding.dueDate}
+              disabled={saving || saved || unknown}
+            />
+            {zh ? "登记的付款日属于本笔待收" : "L’échéance concerne ce solde"} {unpaidDueDate}
+          </label>
+        ) : null}
+        {error ? <div role="alert">{error}</div> : null}
+        {unknown ? (
+          <div role="alert">
+            {zh
+              ? "结果未确认，请原样重试。"
+              : "Résultat non confirmé. Réessayez sans modifier les données."}
+          </div>
+        ) : null}
+        {saved ? (
+          <div role="status">
+            {zh ? "账期已核实，正在刷新。" : "Période vérifiée. Actualisation en cours."}
+          </div>
+        ) : null}
+        <div className={drawerStyles.settlementButtons}>
+          <button type="submit" disabled={saving || saved}>
+            {unknown ? (zh ? "原样重试" : "Réessayer") : zh ? "保存账期" : "Enregistrer la période"}
+          </button>
+        </div>
+      </form>
+    </details>
+  );
+}
+
 export function OperatingAssetDetail({
   asset,
   entries,
@@ -454,10 +589,24 @@ export function OperatingAssetDetail({
         : followUpLabels[followUp.status][lang]
       : null;
   const outstanding = followUp.outstanding;
+  const settled = followUp.settledOutstanding;
+  const settledAmount = settled
+    ? `${zh ? "已结清" : "Réglé"} · ${formatPropertyMoney(settled.amountNative, settled.currency, locale)}`
+    : null;
   const hasOwnerAccount = !!asset.leaseEvidence?.ownerRentAccount;
   const ownerRent = followUp.ownerRent;
   const schedule = asset.monthlyRentSchedule;
   const scheduledPeriods = followUp.scheduledPeriods;
+  const evidence = asset.leaseEvidence;
+  const reviewOutstanding =
+    canWrite &&
+    !settled &&
+    !leaseGroup &&
+    canReviewOperatingAssetOutstanding(asset) &&
+    evidence?.reviewedOn &&
+    evidence.outstanding
+      ? { reviewedOn: evidence.reviewedOn, outstanding: evidence.outstanding }
+      : null;
   const tabs = [
     { value: "overview", label: zh ? "概览" : "Aperçu" },
     { value: "receipts", label: zh ? "收付款" : "Paiements" },
@@ -573,11 +722,23 @@ export function OperatingAssetDetail({
                         ? zh
                           ? "到期未收"
                           : "Loyers échus restant dus"
-                        : zh
-                          ? "原表登记未收"
-                          : "Solde enregistré dans la source"}
+                        : settled && !outstanding
+                          ? zh
+                            ? "原表余款"
+                            : "Solde d’origine"
+                          : zh
+                            ? "原表登记未收"
+                            : "Solde enregistré dans la source"}
                   </dt>
-                  <dd title={outstanding ? assetSourceLabel(outstanding.sourceRef) : undefined}>
+                  <dd
+                    title={
+                      outstanding
+                        ? assetSourceLabel(outstanding.sourceRef)
+                        : settled
+                          ? assetSourceLabel(settled.sourceRef)
+                          : undefined
+                    }
+                  >
                     {hasOwnerAccount
                       ? ownerRent
                         ? formatPropertyMoney(ownerRent.arrearsNative, "XOF", locale)
@@ -592,9 +753,7 @@ export function OperatingAssetDetail({
                           )
                         : schedule
                           ? formatPropertyMoney(0, schedule.currency, locale)
-                          : zh
-                            ? "未登记"
-                            : "Non renseigné"}
+                          : (settledAmount ?? (zh ? "未登记" : "Non renseigné"))}
                   </dd>
                 </div>
               </dl>
@@ -775,7 +934,45 @@ export function OperatingAssetDetail({
                   <dd>{assetSourceLabel(followUp.outstanding.sourceRef)}</dd>
                 </div>
               ) : null}
+              {settled ? (
+                <>
+                  <div>
+                    <dt>{zh ? "原表余款" : "Solde d’origine"}</dt>
+                    <dd>{settledAmount}</dd>
+                  </div>
+                  <div>
+                    <dt>{zh ? "结清账期" : "Période réglée"}</dt>
+                    <dd>
+                      <time dateTime={settled.periodStart}>{settled.periodStart}</time> —{" "}
+                      <time dateTime={settled.periodEnd}>{settled.periodEnd}</time>
+                    </dd>
+                  </div>
+                  <div>
+                    <dt>{zh ? "原表余款依据" : "Source du solde d’origine"}</dt>
+                    <dd title={settled.sourceRef}>{assetSourceLabel(settled.sourceRef)}</dd>
+                  </div>
+                  <div>
+                    <dt>{zh ? "结清凭证" : "Justificatif du règlement"}</dt>
+                    <dd title={settled.receiptSourceRef}>
+                      <time dateTime={settled.cashDate}>{settled.cashDate}</time> ·{" "}
+                      {assetSourceLabel(settled.receiptSourceRef)}
+                    </dd>
+                  </div>
+                </>
+              ) : null}
             </dl>
+            {reviewOutstanding ? (
+              <OutstandingPeriodReview
+                key={JSON.stringify(reviewOutstanding)}
+                assetId={asset.id}
+                reviewedOn={reviewOutstanding.reviewedOn}
+                outstanding={reviewOutstanding.outstanding}
+                unpaidDueDate={
+                  evidence?.nextPayment?.unpaid ? evidence.nextPayment.dueDate : undefined
+                }
+                locale={locale}
+              />
+            ) : null}
             {asset.leaseEvidence?.notes?.length ? (
               <ul className={styles.assetSources}>
                 {asset.leaseEvidence.notes.map((note) => (

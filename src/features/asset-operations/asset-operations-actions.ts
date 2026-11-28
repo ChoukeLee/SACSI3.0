@@ -6,6 +6,7 @@ import { createClient } from "@/lib/supabase/server";
 import { captureOperationFailure } from "@/lib/operation-monitoring";
 import type { AssetOperationKind } from "./asset-operations-model";
 import type { CurrencyCode } from "@/types/domain";
+import type { OperatingAssetReviewedOutstanding } from "./operating-asset-directory-model";
 
 export interface AssetOperationResult {
   ok: boolean;
@@ -37,6 +38,7 @@ async function submit(
   rpcName:
     | "asset_operations_write_rpc"
     | "asset_operations_update_terms_rpc"
+    | "asset_operations_confirm_outstanding_period_rpc"
     | "asset_operations_import_entries_rpc" = "asset_operations_write_rpc",
 ): Promise<AssetOperationResult> {
   const supabase = await createClient();
@@ -179,6 +181,26 @@ export async function updateAssetOperationTerms(input: {
   await requireRole("admin", "finance");
   const { requestId, ...payload } = input;
   return submit("update_asset_terms", payload, requestId, "asset_operations_update_terms_rpc");
+}
+
+export async function confirmAssetOperationOutstandingPeriod(input: {
+  requestId: string;
+  assetId: string;
+  expectedReviewedOn: string;
+  expectedOutstanding: OperatingAssetReviewedOutstanding;
+  periodStart: string;
+  periodEnd: string;
+  dueDate?: string;
+  reason: string;
+}): Promise<AssetOperationResult> {
+  await requireRole("admin", "finance");
+  const { requestId, ...payload } = input;
+  return submit(
+    "confirm_outstanding_period",
+    payload,
+    requestId,
+    "asset_operations_confirm_outstanding_period_rpc",
+  );
 }
 
 export interface AssetOperationEntryImport {
