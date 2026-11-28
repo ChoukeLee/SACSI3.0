@@ -464,6 +464,7 @@ function OperatingWholeLeaseOverview({
   const coverage = followUp.paidThrough;
   const receipts = latestTwoVerifiedRentReceipts(entries, today);
   const outstanding = followUp.outstanding;
+  const settled = followUp.settledOutstanding;
 
   if (asset.leaseEvidence?.ownerRentAccount) {
     const owner = followUp.ownerRent;
@@ -590,14 +591,25 @@ function OperatingWholeLeaseOverview({
                 )}
               </dd>
             </div>
-            <div>
-              <dt>{zh ? "待收租金" : "Loyer à recevoir"}</dt>
-              <dd>
-                {outstanding
-                  ? formatPropertyMoney(outstanding.amountNative, outstanding.currency, locale)
-                  : missing}
-              </dd>
-            </div>
+            {outstanding || !settled ? (
+              <div>
+                <dt>{zh ? "待收租金" : "Loyer à recevoir"}</dt>
+                <dd>
+                  {outstanding
+                    ? formatPropertyMoney(outstanding.amountNative, outstanding.currency, locale)
+                    : missing}
+                </dd>
+              </div>
+            ) : null}
+            {settled ? (
+              <div>
+                <dt>{zh ? "原表余款" : "Solde d’origine"}</dt>
+                <dd title={assetSourceLabel(settled.sourceRef)}>
+                  {zh ? "已结清" : "Réglé"} ·{" "}
+                  {formatPropertyMoney(settled.amountNative, settled.currency, locale)}
+                </dd>
+              </div>
+            ) : null}
           </dl>
           {receipts.length ? (
             <div className={styles.wholeReceipts}>

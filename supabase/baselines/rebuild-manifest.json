@@ -329,6 +329,10 @@
     {
       "file": "20261119115407_cimac_apartment_combined_receipts.sql",
       "sha256": "0f80f36ba3c258266c8d6ad47660ccd4d46d839f1216d999972031563d773c09"
+    },
+    {
+      "file": "20261128102022_asset_operations_confirm_outstanding_period.sql",
+      "sha256": "ee102af7d3d20c835d7e41080ced9527c6af87602cbefbeeb5aecec8e10156a3"
     }
   ],
   "excluded": [

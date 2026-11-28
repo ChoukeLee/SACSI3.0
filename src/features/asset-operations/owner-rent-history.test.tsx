@@ -18,6 +18,9 @@ import { buildOperatingCollectionRows } from "@/features/leases/unified-lease-co
 import { UnifiedLeaseCollections } from "@/features/leases/unified-lease-collections";
 
 const mocks = vi.hoisted(() => ({ context: vi.fn(), save: vi.fn(), refresh: vi.fn() }));
+vi.mock("./asset-operations-actions", () => ({
+  confirmAssetOperationOutstandingPeriod: vi.fn(),
+}));
 vi.mock("./owner-settlement-actions", () => ({
   getOwnerSettlementContext: mocks.context,
   backfillOwnerRentHistory: mocks.save,
